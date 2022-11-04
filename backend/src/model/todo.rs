@@ -59,12 +59,9 @@ impl TodoMac {
 			.table(Self::TABLE)
 			.columns(Self::COLUMNS)
 			.and_where_eq("id", id);
-		let todo = sb.fetch_one(db).await.map_err(|sqlx_error| match sqlx_error {
-			sqlx::Error::RowNotFound => model::Error::EntityNotFound(Self::TABLE, id.to_string()),
-			other => model::Error::SqlxError(other),
-		})?;
+		let result = sb.fetch_one(db).await;
 
-		Ok(todo)
+		handle_fetch_one_result(result, Self::TABLE, id)
 	}
 
 	pub async fn update(db: &Db, utx: &UserCtx, id: i64, data: TodoPatch) -> Result<Todo, model::Error> {
@@ -73,9 +70,9 @@ impl TodoMac {
 			.data(data.fields())
 			.and_where_eq("id", id)
 			.returning(Self::COLUMNS);
-		let todo = sb.fetch_one(db).await?;
+		let result = sb.fetch_one(db).await;
 
-		Ok(todo)
+		handle_fetch_one_result(result, Self::TABLE, id)
 	}
 
 	pub async fn list(db: &Db, _utx: &UserCtx) -> Result<Vec<Todo>, model::Error> {
@@ -87,6 +84,19 @@ impl TodoMac {
 
 		Ok(todos)
 	}
+}
+/* #endregion */
+
+/* #region  Utils */
+fn handle_fetch_one_result(
+	result: Result<Todo, sqlx::Error>,
+	typ: &'static str,
+	id: i64,
+) -> Result<Todo, model::Error> {
+	result.map_err(|sqlx_error| match sqlx_error {
+		sqlx::Error::RowNotFound => model::Error::EntityNotFound(typ, id.to_string()),
+		other => model::Error::SqlxError(other),
+	})
 }
 /* #endregion */
 
