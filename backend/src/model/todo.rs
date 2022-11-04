@@ -1,7 +1,7 @@
 use sqlb::HasFields;
 
 use super::db::Db;
-use crate::model;
+use crate::{model, security::UserCtx};
 
 /* #region  Todo Types */
 #[derive(sqlx::FromRow, Debug, Clone)]
@@ -34,7 +34,7 @@ sqlb::bindable!(TodoStatus);
 pub struct TodoMac;
 
 impl TodoMac {
-	pub async fn create(db: &Db, data: TodoPatch) -> Result<Todo, model::Error> {
+	pub async fn create(db: &Db, utx: &UserCtx, data: TodoPatch) -> Result<Todo, model::Error> {
 		// let sql = "INSERT INTO todo (cid, title) VALUES ($1, $2) returning id, cid, title, status"; // TODO - make it dynamic instead of static
 		// let query = sqlx::query_as::<_, Todo>(&sql)
 		// 	.bind(123 as i64) // FIXME - should come from user context
@@ -52,9 +52,12 @@ impl TodoMac {
 		Ok(todo)
 	}
 
-	pub async fn list(db: &Db) -> Result<Vec<Todo>, model::Error> {
+	pub async fn list(db: &Db, _utx: &UserCtx) -> Result<Vec<Todo>, model::Error> {
 		// let sql = "SELECT id, cid, title, status FROM todo ORDER BY id DESC";
-		let sb = sqlb::select().table("todo").columns(&["id", "cid", "title", "status"]);
+		let sb = sqlb::select()
+			.table("todo")
+			.columns(&["id", "cid", "title", "status"])
+			.order_by("!id");
 
 		// execute the query
 		let todos = sb.fetch_all(db).await?;
