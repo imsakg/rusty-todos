@@ -6,7 +6,7 @@ use serde_json::json;
 use std::{convert::Infallible, sync::Arc};
 use warp::{reply::Json, Filter, Rejection};
 
-pub fn todo_reset_filters(
+pub fn todo_rest_filters(
 	base_path: &'static str,
 	db: Arc<Db>,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -44,6 +44,6 @@ pub fn do_auth(_db: Arc<Db>) -> impl Filter<Extract = (UserCtx,), Error = Reject
 
 /* #region  Test */
 #[cfg(test)]
-#[path = "../_tests/web_todo..rs"]
+#[path = "../_tests/web_todo.rs"]
 mod tests;
 /* #endregion */
