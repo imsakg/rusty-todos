@@ -1,4 +1,6 @@
-use sqlb::HasFields;
+use std::result;
+
+use sqlb::{HasFields, Raw};
 
 use super::db::Db;
 use crate::{model, security::UserCtx};
@@ -65,9 +67,14 @@ impl TodoMac {
 	}
 
 	pub async fn update(db: &Db, utx: &UserCtx, id: i64, data: TodoPatch) -> Result<Todo, model::Error> {
+		let mut fields = data.fields();
+		// augment the fields with the cid/ctime
+		fields.push(("mid", utx.user_id).into());
+		fields.push(("ctime", Raw("now()")).into());
+
 		let sb = sqlb::update()
 			.table(Self::TABLE)
-			.data(data.fields())
+			.data(fields)
 			.and_where_eq("id", id)
 			.returning(Self::COLUMNS);
 		let result = sb.fetch_one(db).await;
@@ -83,6 +90,16 @@ impl TodoMac {
 		let todos = sb.fetch_all(db).await?;
 
 		Ok(todos)
+	}
+
+	pub async fn delete(db: &Db, _utx: &UserCtx, id: i64) -> Result<Todo, model::Error> {
+		let sb = sqlb::delete()
+			.table(Self::TABLE)
+			.returning(Self::COLUMNS)
+			.and_where_eq("id", id);
+		let result = sb.fetch_one(db).await;
+
+		handle_fetch_one_result(result, Self::TABLE, id)
 	}
 }
 /* #endregion */
