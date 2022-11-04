@@ -5,7 +5,7 @@ An todo app to sharpen my rusty sword.
 ## Cargo Watch
 
 ```sh
-cargo watch -q -c -w src/ -x 'test model_db_ -- --test-threads=1 --nocapture'
+cargo watch -q -c -w src/ -x 'test model_ -- --test-threads=1 --nocapture'
 ```
 
 ## DB
