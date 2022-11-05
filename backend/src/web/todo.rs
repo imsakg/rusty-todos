@@ -6,6 +6,8 @@ use serde_json::json;
 use std::{convert::Infallible, sync::Arc};
 use warp::{reply::Json, Filter, Rejection};
 
+use super::{filter_auth::do_auth, filter_utils::with_db};
+
 pub fn todo_rest_filters(
 	base_path: &'static str,
 	db: Arc<Db>,
@@ -25,22 +27,12 @@ pub fn todo_rest_filters(
 
 async fn todo_list(db: Arc<Db>, utx: UserCtx) -> Result<Json, warp::Rejection> {
 	// FIXME: Add proper error handling
-	let todos = TodoMac::list(&db, &utx).await.unwrap();
+	let todos = TodoMac::list(&db, &utx).await?;
 
 	let response = json!({ "data": todos });
 
 	Ok(warp::reply::json(&response))
 }
-
-/* #region  Filter Utils */
-pub fn with_db(db: Arc<Db>) -> impl Filter<Extract = (Arc<Db>,), Error = Infallible> + Clone {
-	warp::any().map(move || db.clone())
-}
-
-pub fn do_auth(_db: Arc<Db>) -> impl Filter<Extract = (UserCtx,), Error = Rejection> + Clone {
-	warp::any().and_then(|| async { Ok::<UserCtx, Rejection>(utx_from_token("123").await.unwrap()) })
-}
-/* #endregion */
 
 /* #region  Test */
 #[cfg(test)]
