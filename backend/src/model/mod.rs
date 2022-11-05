@@ -7,7 +7,7 @@ mod todo;
 // re-export
 pub use db::init_db;
 pub use db::Db;
-pub use todo::TodoMac;
+pub use todo::{Todo, TodoMac, TodoPatch, TodoStatus};
 
 #[derive(ThisError, Debug)]
 pub enum Error {
