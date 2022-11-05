@@ -1,7 +1,8 @@
 use crate::{
-	model::{Db, TodoMac},
+	model::{Db, TodoMac, TodoPatch},
 	security::{utx_from_token, UserCtx},
 };
+use serde::Serialize;
 use serde_json::json;
 use std::{convert::Infallible, sync::Arc};
 use warp::{reply::Json, Filter, Rejection};
@@ -22,17 +23,43 @@ pub fn todo_rest_filters(
 		.and(common.clone())
 		.and_then(todo_list);
 
+	// GET todo 'GET /todo/100/'
+
 	list
 }
 
 async fn todo_list(db: Arc<Db>, utx: UserCtx) -> Result<Json, warp::Rejection> {
 	// FIXME: Add proper error handling
 	let todos = TodoMac::list(&db, &utx).await?;
+	json_response(todos)
+}
 
-	let response = json!({ "data": todos });
+async fn todo_get(db: Arc<Db>, utx: UserCtx, id: i64) -> Result<Json, warp::Rejection> {
+	let todo = TodoMac::get(&db, &utx, id).await?;
+	json_response(todo)
+}
 
+async fn todo_create(db: Arc<Db>, utx: UserCtx, patch: TodoPatch) -> Result<Json, warp::Rejection> {
+	let todo = TodoMac::create(&db, &utx, patch).await?;
+	json_response(todo)
+}
+
+async fn todo_update(db: Arc<Db>, utx: UserCtx, id: i64, patch: TodoPatch) -> Result<Json, warp::Rejection> {
+	let todo = TodoMac::update(&db, &utx, id, patch).await?;
+	json_response(todo)
+}
+
+async fn todo_delete(db: Arc<Db>, utx: UserCtx, id: i64) -> Result<Json, warp::Rejection> {
+	let todo = TodoMac::delete(&db, &utx, id).await?;
+	json_response(todo)
+}
+
+/* #region  Utils */
+fn json_response<D: Serialize>(data: D) -> Result<Json, warp::Rejection> {
+	let response = json!({ "data": data });
 	Ok(warp::reply::json(&response))
 }
+/* #endregion */
 
 /* #region  Test */
 #[cfg(test)]
