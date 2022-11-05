@@ -1,13 +1,13 @@
 use std::result;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlb::{HasFields, Raw};
 
 use super::db::Db;
 use crate::{model, security::UserCtx};
 
 /* #region  Todo Types */
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct Todo {
 	pub id: i64,
 	pub cid: i64,
@@ -21,7 +21,7 @@ pub struct TodoPatch {
 	pub status: Option<TodoStatus>,
 }
 
-#[derive(sqlx::Type, Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(sqlx::Type, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[sqlx(type_name = "todo_status_enum")]
 #[sqlx(rename_all = "lowercase")]
 pub enum TodoStatus {
