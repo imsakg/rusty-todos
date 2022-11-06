@@ -1,6 +1,7 @@
 use crate::{
 	model::{self, Db},
 	security,
+	web::todo::todo_rest_filters,
 };
 use serde_json::json;
 use warp::{Filter, Rejection, Reply};
@@ -17,6 +18,9 @@ pub async fn start_web(web_folder: &str, web_port: u16, db: Arc<Db>) -> Result<(
 		return Err(Error::FailStartWebFolderNotFound((web_folder.to_string())));
 	}
 
+	// APIs
+	let apis = todo_rest_filters("api", db);
+
 	// Static content
 	let content = warp::fs::dir(web_folder.to_string());
 	let root_index = warp::get()
@@ -25,7 +29,7 @@ pub async fn start_web(web_folder: &str, web_port: u16, db: Arc<Db>) -> Result<(
 	let static_site = content.or(root_index);
 
 	// Combine all routes
-	let routes = static_site.recover(handle_rejection);
+	let routes = apis.or(static_site).recover(handle_rejection);
 
 	println!("Start 127.0.0.1:{} at {}", web_port, web_folder);
 	warp::serve(routes).run(([127, 0, 0, 1], web_port)).await;
