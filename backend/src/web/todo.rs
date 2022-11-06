@@ -5,7 +5,7 @@ use crate::{
 use serde::Serialize;
 use serde_json::json;
 use std::{convert::Infallible, sync::Arc};
-use warp::{reply::Json, Filter, Rejection};
+use warp::{body::json, reply::Json, Filter, Rejection};
 
 use super::{filter_auth::do_auth, filter_utils::with_db};
 
@@ -23,9 +23,36 @@ pub fn todo_rest_filters(
 		.and(common.clone())
 		.and_then(todo_list);
 
-	// GET todo 'GET /todo/100/'
+	// GET todo `GET /todo/100/`
+	let get = todos_path
+		.and(warp::get())
+		.and(common.clone())
+		.and(warp::path::param())
+		.and_then(todo_get);
 
-	list
+	// CREATE todo `POST /todos with body TodoPatch`
+	let create = todos_path
+		.and(warp::post())
+		.and(common.clone())
+		.and(warp::body::json())
+		.and_then(todo_create);
+
+	// UPDATE todo `POST /todos/100 with body TodoPatch`
+	let update = todos_path
+		.and(warp::patch())
+		.and(common.clone())
+		.and(warp::path::param())
+		.and(warp::body::json())
+		.and_then(todo_update);
+
+	// Delete todo `DELETE /todos/100`
+	let delete = todos_path
+		.and(warp::delete())
+		.and(common.clone())
+		.and(warp::path::param())
+		.and_then(todo_delete);
+
+	list.or(get).or(create).or(update).or(delete)
 }
 
 async fn todo_list(db: Arc<Db>, utx: UserCtx) -> Result<Json, warp::Rejection> {

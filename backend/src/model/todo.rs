@@ -15,7 +15,7 @@ pub struct Todo {
 	pub status: TodoStatus,
 }
 
-#[derive(sqlb::Fields, Default, Debug, Clone)]
+#[derive(sqlb::Fields, Default, Debug, Clone, Deserialize)]
 pub struct TodoPatch {
 	pub title: Option<String>,
 	pub status: Option<TodoStatus>,
