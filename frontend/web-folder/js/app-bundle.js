@@ -23,6 +23,12 @@
         return c > 3 && r && Object.defineProperty(target, key, r), r;
     }
 
+    function __classPrivateFieldGet(receiver, state, kind, f) {
+        if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
+        if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
+        return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
+    }
+
     function __classPrivateFieldSet(receiver, state, value, kind, f) {
         if (kind === "m") throw new TypeError("Private method is not writable");
         if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
@@ -626,6 +632,33 @@
 
     const _onEventsByConstructor = new Map();
     const _computedOnDOMEventsByConstructor = new WeakMap();
+    //#region    ---------- Public onEvent Decorator ---------- 
+    function onEvent(type, selector) {
+        return _onDOMEvent(null, type, selector);
+    }
+    //#endregion ---------- /Public onEvent Decorator ---------- 
+    // the decorator function
+    function _onDOMEvent(evtTarget, type, selector) {
+        // target references the element's class. It will be the constructor function for a static method or the prototype of the class for an instance member
+        return function (target, propertyKey, descriptor) {
+            descriptor.value;
+            const clazz = target.constructor;
+            // get the onEvents array for this clazz
+            let onEvents = _onEventsByConstructor.get(clazz);
+            if (onEvents == null) {
+                onEvents = [];
+                _onEventsByConstructor.set(clazz, onEvents);
+            }
+            // create and push the event
+            const onEvent = {
+                target: evtTarget,
+                name: propertyKey,
+                type: type,
+                selector: selector || null
+            };
+            onEvents.push(onEvent);
+        };
+    }
     /** Bind the element OnDOMEvent registred in the decorator _onDOMEvent  */
     function bindOnElementEventsDecorators(el) {
         const clazz = el.constructor;
@@ -729,6 +762,30 @@
 
     const _onHubEventByConstructor = new Map();
     const _computedOnHubEventByConstructor = new WeakMap();
+    //#region    ---------- Public onEvent Decorator ---------- 
+    /**
+     * `onHub` decorator to bind a hub event to this instance.
+     */
+    function onHub(hubName, topic, label) {
+        // target references the element's class. It will be the constructor function for a static method or the prototype of the class for an instance member
+        return function (target, propertyKey, descriptor) {
+            const clazz = target.constructor;
+            // get the onEvents array for this clazz
+            let onEvents = _onHubEventByConstructor.get(clazz);
+            if (onEvents == null) {
+                onEvents = [];
+                _onHubEventByConstructor.set(clazz, onEvents);
+            }
+            // create and push the event
+            const onEvent = {
+                methodName: propertyKey,
+                hubName,
+                topic,
+                label
+            };
+            onEvents.push(onEvent);
+        };
+    }
     //#endregion ---------- /Public onEvent Decorator ---------- 
     function hasHubEventDecorators(el) {
         return getComputedOnHubEvents(el.constructor) != null;
@@ -933,6 +990,31 @@
         return template.content;
     }
 
+    function first(el_or_selector, selector) {
+        // We do not have a selector at all, then, this call is for firstElementChild
+        if (!selector && typeof el_or_selector !== "string") {
+            const el = el_or_selector;
+            // try to get 
+            const firstElementChild = el.firstElementChild;
+            // if firstElementChild is null/undefined, but we have a firstChild, it is perhaps because not supported
+            if (!firstElementChild && el.firstChild) {
+                // If the firstChild is of type Element, return it. 
+                if (el.firstChild.nodeType === 1) {
+                    return el.firstChild;
+                }
+                // Otherwise, try to find the next element (using the next)
+                else {
+                    // TODO: Needs to look at typing here, this is a ChildNode
+                    return next(el.firstChild);
+                }
+            }
+            return firstElementChild;
+        }
+        // otherwise, the call was either (selector) or (el, selector), so foward to the querySelector
+        else {
+            return _execQuerySelector(false, el_or_selector, selector);
+        }
+    }
     function getChild(el, name) {
         name = name.toUpperCase();
         for (const child of el.children) {
@@ -941,6 +1023,74 @@
             }
         }
         throw new Error(`dom-native - getChild - No child found for selector ${name}`);
+    }
+    function getChildren(el, ...names) {
+        const childrenCount = el.childElementCount;
+        if (childrenCount < names.length) {
+            throw new Error("dom-native - getChildren - node has less children than requested names");
+        }
+        const result = [];
+        let nameIdx = 0;
+        for (const child of el.children) {
+            let name = names[nameIdx].toUpperCase();
+            if (child.tagName === name) {
+                // Note: could do an instanceof HTMLElement (need measure perf impact vs value of the check)
+                result.push(child);
+                nameIdx += 1;
+            }
+            if (nameIdx >= childrenCount || nameIdx >= names.length) {
+                break;
+            }
+        }
+        if (result.length < names.length) {
+            throw new Error("dom-native - getChildren - node has match children than requested");
+        }
+        return result;
+    }
+    // #endregion --- getChildren
+    // #region    --- next & prev
+    /**
+     * Get the eventual next sibling of an HTMLElement given (optionally as selector)
+     */
+    function next(el, selector) {
+        return _sibling(true, el, selector); // assume HTMLElement
+    }
+    /**
+     * Return the next or previous Element sibling
+     * @param next
+     * @param el
+     * @param selector
+     */
+    function _sibling(next, el, selector) {
+        const sibling = (next) ? 'nextSibling' : 'previousSibling';
+        let tmpEl = (el) ? el[sibling] : null;
+        // use "!=" for null and undefined
+        while (tmpEl != null && tmpEl != document) {
+            // only if node type is of Element, otherwise, 
+            if (tmpEl.nodeType === 1 && (!selector || tmpEl.matches(selector))) {
+                return tmpEl;
+            }
+            tmpEl = tmpEl[sibling];
+        }
+        return null;
+    }
+    // #endregion --- next & prev
+    // util: querySelector[All] wrapper
+    function _execQuerySelector(all, elOrSelector, selector) {
+        let el = null;
+        // if el is null or undefined, means we return nothing. 
+        if (elOrSelector == null) {
+            return null;
+        }
+        // if selector is undefined, it means we select from document and el is the document
+        if (typeof selector === "undefined") {
+            selector = elOrSelector;
+            el = document;
+        }
+        else {
+            el = elOrSelector;
+        }
+        return (all) ? el.querySelectorAll(selector) : el.querySelector(selector);
     }
     // #endregion --- append
 
@@ -954,38 +1104,230 @@
         };
     }
 
-    var _TodoInput_inputEl;
-    let RustyTodos = class RustyTodos extends BaseHTMLElement {
+    /**
+     * c-ico - svg icons waring the svg use
+     * Note: Assume the symbol are local to the document
+     */
+    let Ico = class Ico extends BaseHTMLElement {
         init() {
-            let htmlContent = html `
-            <div class="box"></div>
-            <h1>todos</h1>
-            <todos-input></todos-input>
-            <todo-list></todo-list>
-        `;
+            const name = this.getAttribute("name")?.trim();
+            const htmlContent = html `<svg class="symbol">
+    	<use xlink:href="#${name}"></use>
+    </svg>`;
             this.append(htmlContent);
         }
     };
-    RustyTodos = __decorate([
-        customElement("rusty-todos")
-    ], RustyTodos);
+    Ico = __decorate([
+        customElement('c-ico')
+    ], Ico);
+
+    const API_BASE_PATH = '/api';
+    async function webGet(path, data) {
+        return webCall("GET", path, data);
+    }
+    async function webPost(path, data) {
+        return webCall("POST", path, data);
+    }
+    async function webPatch(path, data) {
+        return webCall("PATCH", path, data);
+    }
+    async function webDelete(path, data) {
+        return webCall("DELETE", path, data);
+    }
+    async function webCall(httpMethod, path, data) {
+        const url = `${API_BASE_PATH}/${path}`;
+        const response = await fetch(url, {
+            method: httpMethod,
+            mode: 'same-origin',
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Auth-Token': '123'
+            },
+            body: JSON.stringify(data)
+        });
+        let res = await response.json();
+        return res.data;
+    }
+
+    class TodoMco {
+        async list() {
+            const data = await webGet("todos");
+            return data;
+        }
+        async create(data) {
+            // guard (TODO - validate data)
+            if (data.title == null || data.title.trim().length == 0) {
+                throw new Error("Cannot create Todo with empty title");
+            }
+            // to server
+            const newData = await webPost('todos', data);
+            // sending event
+            hub('dataHub').pub('Todo', 'create', newData);
+            return newData;
+        }
+        async update(id, data) {
+            // TODO - validate data
+            // to server
+            const newData = await webPatch(`todos/${id}`, data);
+            // event
+            hub('dataHub').pub('Todo', 'update', newData);
+            return newData;
+        }
+        async delete(id) {
+            // to server
+            const oldData = await webDelete(`todos/${id}`);
+            // event
+            hub('dataHub').pub('Todo', 'delete', oldData);
+            return oldData;
+        }
+    }
+    const todoMco = new TodoMco();
+
+    var _TodoMvc_todoInputEl, _TodoMvc_todoListEl, _TodoInput_inputEl, _TodoItem_titleEl, _TodoItem_data;
+    let TodoMvc = class TodoMvc extends BaseHTMLElement {
+        constructor() {
+            super(...arguments);
+            _TodoMvc_todoInputEl.set(this, void 0);
+            _TodoMvc_todoListEl.set(this, void 0);
+            // #endregion --- Data Events
+        }
+        init() {
+            var _a, _b;
+            let htmlContent = html `
+        <div class="box"></div>
+        <h1>todos</h1>
+        <todo-input></todo-input>
+        <todo-list></todo-list>    
+    `;
+            _a = this, _b = this, [({ set value(_c) { __classPrivateFieldSet(_a, _TodoMvc_todoInputEl, _c, "f"); } }).value, ({ set value(_c) { __classPrivateFieldSet(_b, _TodoMvc_todoListEl, _c, "f"); } }).value] =
+                getChildren(htmlContent, 'todo-input', 'todo-list');
+            this.append(htmlContent);
+            this.refresh();
+        }
+        async refresh() {
+            let todos = await todoMco.list();
+            let htmlContent = document.createDocumentFragment();
+            for (const todo of todos) {
+                const el = document.createElement('todo-item');
+                el.data = todo; // todo will be frozen
+                htmlContent.append(el);
+            }
+            __classPrivateFieldGet(this, _TodoMvc_todoListEl, "f").innerHTML = '';
+            __classPrivateFieldGet(this, _TodoMvc_todoListEl, "f").append(htmlContent);
+        }
+        // #region    --- UI Events
+        onCheckTodo(evt) {
+            const todoItem = evt.selectTarget.closest("todo-item");
+            const status = todoItem.data.status == 'Open' ? 'Close' : 'Open';
+            // update to server
+            todoMco.update(todoItem.data.id, {
+                status
+            });
+        }
+        // #endregion --- UI Events
+        // #region    --- Data Events
+        onTodoUpdate(data) {
+            // find the todo in the UI
+            const todoItem = first(`todo-item.Todo-${data.id}`);
+            // if found, update it.
+            if (todoItem) {
+                todoItem.data = data; // data will be frozen
+            }
+        }
+        onTodoCreate(data) {
+            this.refresh();
+        }
+    };
+    _TodoMvc_todoInputEl = new WeakMap(), _TodoMvc_todoListEl = new WeakMap();
+    __decorate([
+        onEvent('pointerup', 'c-check')
+    ], TodoMvc.prototype, "onCheckTodo", null);
+    __decorate([
+        onHub('dataHub', 'Todo', 'update')
+    ], TodoMvc.prototype, "onTodoUpdate", null);
+    __decorate([
+        onHub('dataHub', 'Todo', 'create')
+    ], TodoMvc.prototype, "onTodoCreate", null);
+    TodoMvc = __decorate([
+        customElement("todo-mvc")
+    ], TodoMvc);
     let TodoInput = class TodoInput extends BaseHTMLElement {
         constructor() {
             super(...arguments);
             _TodoInput_inputEl.set(this, void 0);
+            // #endregion --- UI Events
         }
         init() {
             let htmlContent = html `
-            <input type="text" placeholder="What needs to be done?">
-        `;
+        <input type="text" placeholder="What needs to be done?">
+    `;
             __classPrivateFieldSet(this, _TodoInput_inputEl, getChild(htmlContent, 'input'), "f");
             this.append(htmlContent);
         }
+        // #region    --- UI Events
+        onInputKeyUp(evt) {
+            if (evt.key == "Enter") {
+                // get value from UI
+                const title = __classPrivateFieldGet(this, _TodoInput_inputEl, "f").value;
+                // send create to server
+                todoMco.create({
+                    title
+                });
+                // don't wait, reset value input
+                __classPrivateFieldGet(this, _TodoInput_inputEl, "f").value = '';
+            }
+        }
     };
     _TodoInput_inputEl = new WeakMap();
+    __decorate([
+        onEvent('keyup', 'input')
+    ], TodoInput.prototype, "onInputKeyUp", null);
     TodoInput = __decorate([
         customElement("todo-input")
     ], TodoInput);
+    let TodoItem = class TodoItem extends BaseHTMLElement {
+        constructor() {
+            super(...arguments);
+            _TodoItem_titleEl.set(this, void 0);
+            _TodoItem_data.set(this, void 0);
+        }
+        set data(data) {
+            let oldData = __classPrivateFieldGet(this, _TodoItem_data, "f");
+            __classPrivateFieldSet(this, _TodoItem_data, Object.freeze(data), "f");
+            if (this.isConnected) {
+                this.refresh(oldData);
+            }
+        }
+        get data() {
+            return __classPrivateFieldGet(this, _TodoItem_data, "f");
+        }
+        init() {
+            let htmlContent = html `
+			<c-check><c-ico name="ico-done"></c-ico></c-check>
+			<div class="title">STATIC TITLE</div>
+			<c-ico name="del"></c-ico>        
+    `;
+            __classPrivateFieldSet(this, _TodoItem_titleEl, getChild(htmlContent, 'div'), "f");
+            this.append(htmlContent);
+            this.refresh();
+        }
+        refresh(old) {
+            if (old != null) {
+                this.classList.remove(`Todo-${old.id}`);
+                this.classList.remove(old.status);
+            }
+            // render new data
+            const todo = __classPrivateFieldGet(this, _TodoItem_data, "f");
+            this.classList.add(`Todo-${todo.id}`);
+            this.classList.add(todo.status);
+            __classPrivateFieldGet(this, _TodoItem_titleEl, "f").textContent = todo.title;
+        }
+    };
+    _TodoItem_titleEl = new WeakMap(), _TodoItem_data = new WeakMap();
+    TodoItem = __decorate([
+        customElement('todo-item')
+    ], TodoItem);
 
 })();
 //# sourceMappingURL=app-bundle.js.map

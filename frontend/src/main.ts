@@ -1,1 +1,2 @@
-import './ui/rusty-todos.js';
+import './ui/commons.js';
+import './ui/todo-mvc.js';
