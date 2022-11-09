@@ -6,13 +6,20 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>rusty-todos</title>
-    <script src="js/app-bundle.js"></script>
     <link rel="stylesheet" href="css/main.css">
     <link rel="icon" href="data:,">
+    <script src="js/app-bundle.js"></script>
 </head>
 
 <body>
-    <rusty-todos></rusty-todos>
+    <svg style="display:none" xmlns="https://www.w3.org/2000/svg">
+        <defs>
+            <symbol id="ico-done" viewBox="0 0 24 24">
+                <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z" />
+            </symbol>
+        </defs>
+    </svg>
+    <todo-mvc></todo-mvc>
 </body>
 
 </html>
