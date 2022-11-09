@@ -1,1 +1,1 @@
-console.log("->> main.ts init");
+import './ui/rusty-todos.js';
