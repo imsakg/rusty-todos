@@ -2,6 +2,25 @@
 
 An todo app to sharpen my rusty sword.
 
+## Run this at your home
+
+### Terminal 1 - start postgresql
+```sh
+docker run --rm -p 5432:5432 -e "POSTGRES_PASSWORD=postgres" --name pg postgres:14
+```
+
+### Terminal 2 - build frontend
+```sh
+cd frontend
+npm run build
+```
+
+### Terminal 3 - build backend
+```sh
+cd backend
+cargo run -- ../frontend/web-folder
+```
+
 ## Dev Test
 
 ### Test for Models
