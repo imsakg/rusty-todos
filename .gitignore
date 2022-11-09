@@ -10,5 +10,7 @@ Cargo.lock
 **/*.rs.bk
 
 # .vscode
-
 *.vscode
+
+# installed node modules
+*/node_modules/
