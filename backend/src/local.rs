@@ -321,14 +321,27 @@ pub struct Query {
 	pub category: Option<String>,
 	pub uncategorized: bool,
 	pub priority: Option<Priority>,
+	pub search: Option<String>,
+	pub due_before: Option<NaiveDate>,
+	pub overdue_as_of: Option<NaiveDate>,
 }
 
 impl Store {
 	pub fn query(&self, query: &Query) -> Vec<&Task> {
+		let search = query.search.as_ref().map(|value| value.to_lowercase());
 		self.tasks
 			.iter()
 			.filter(|task| {
-				query.status.is_none_or(|status| task.status == status)
+				search
+					.as_ref()
+					.is_none_or(|text| task.title.to_lowercase().contains(text))
+					&& query
+						.due_before
+						.is_none_or(|date| task.due.is_some_and(|due| due <= date))
+					&& query
+						.overdue_as_of
+						.is_none_or(|date| task.status == Status::Open && task.due.is_some_and(|due| due < date))
+					&& query.status.is_none_or(|status| task.status == status)
 					&& query
 						.category
 						.as_ref()

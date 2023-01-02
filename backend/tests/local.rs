@@ -187,3 +187,31 @@ fn query_combines_status_category_and_priority_filters() {
 		3
 	);
 }
+
+#[test]
+fn search_and_due_filters_exclude_unscheduled_and_completed_overdue_tasks() {
+	let mut store = Store::default();
+	for title in ["Write REPORT", "report later", "read"] {
+		store.create(title).unwrap();
+	}
+	store.set_due(1, Some(parse_date("2024-06-01").unwrap())).unwrap();
+	store.set_due(2, Some(parse_date("2024-06-03").unwrap())).unwrap();
+	let as_of = parse_date("2024-06-03").unwrap();
+	let query = Query {
+		search: Some("report".into()),
+		overdue_as_of: Some(as_of),
+		..Default::default()
+	};
+	assert_eq!(store.query(&query).iter().map(|t| t.id).collect::<Vec<_>>(), vec![1]);
+	store.set_status(1, Status::Done).unwrap();
+	assert!(store.query(&query).is_empty());
+	assert_eq!(
+		store
+			.query(&Query {
+				due_before: Some(as_of),
+				..Default::default()
+			})
+			.len(),
+		2
+	);
+}
