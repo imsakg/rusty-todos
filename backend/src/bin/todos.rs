@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use rusty_todos::local::{Result, Store};
+use rusty_todos::local::{Result, Status, Store};
 use std::{path::PathBuf, process::ExitCode};
 
 #[derive(Parser)]
@@ -19,6 +19,14 @@ enum Action {
 	List,
 	/// Show one todo.
 	Show { id: u64 },
+	/// Rename a todo.
+	Edit { id: u64, title: String },
+	/// Delete one todo.
+	Delete { id: u64 },
+	/// Mark a todo complete.
+	Done { id: u64 },
+	/// Reopen a completed todo.
+	Reopen { id: u64 },
 }
 
 fn execute(cli: Cli) -> Result<()> {
@@ -27,6 +35,10 @@ fn execute(cli: Cli) -> Result<()> {
 		Action::Add { title } => (serde_json::to_value(store.create(&title)?)?, true),
 		Action::List => (serde_json::to_value(store.tasks())?, false),
 		Action::Show { id } => (serde_json::to_value(store.get(id)?)?, false),
+		Action::Edit { id, title } => (serde_json::to_value(store.rename(id, &title)?)?, true),
+		Action::Delete { id } => (serde_json::to_value(store.delete(id)?)?, true),
+		Action::Done { id } => (serde_json::to_value(store.set_status(id, Status::Done)?)?, true),
+		Action::Reopen { id } => (serde_json::to_value(store.set_status(id, Status::Open)?)?, true),
 	};
 	if changed {
 		store.save(&cli.data)?;

@@ -19,3 +19,15 @@ fn add_list_and_show_work_across_processes() {
     assert_eq!(serde_json::from_slice::<Vec<serde_json::Value>>(&listed.stdout).unwrap().len(), 1);
     assert!(!cli(&path, &["show", "999"]).status.success());
 }
+
+#[test]
+fn edits_completion_and_deletion_persist() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("todos.json");
+    assert!(cli(&path, &["add", "before"]).status.success());
+    for args in [&["edit", "1", "after"][..], &["done", "1"], &["reopen", "1"]] {
+        assert!(cli(&path, args).status.success());
+    }
+    assert!(cli(&path, &["delete", "1"]).status.success());
+    assert!(!cli(&path, &["show", "1"]).status.success());
+}
