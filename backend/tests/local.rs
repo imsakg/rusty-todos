@@ -115,3 +115,16 @@ fn category_renames_and_removals_update_every_member() {
 	assert!(store.categories().is_empty());
 	assert!(store.remove_category("missing").is_err());
 }
+
+#[test]
+fn priorities_default_to_normal_and_serialize_as_names() {
+	let mut store = Store::default();
+	assert_eq!(store.create("normal").unwrap().priority, Priority::Normal);
+	assert_eq!(
+		store.set_priority(1, Priority::Urgent).unwrap().priority,
+		Priority::Urgent
+	);
+	assert_eq!(serde_json::to_string(&Priority::High).unwrap(), "\"high\"");
+	assert!(serde_json::from_str::<Priority>("\"impossible\"").is_err());
+	assert!(store.set_priority(99, Priority::Low).is_err());
+}

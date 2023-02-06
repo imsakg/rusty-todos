@@ -40,6 +40,8 @@ pub struct Task {
 	pub status: Status,
 	#[serde(default)]
 	pub category: Option<String>,
+	#[serde(default)]
+	pub priority: Priority,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,6 +69,7 @@ impl Store {
 			title,
 			status: Status::Open,
 			category: None,
+			priority: Priority::Normal,
 		};
 		self.tasks.push(task.clone());
 		self.next_id = next;
@@ -234,5 +237,23 @@ impl Store {
 			}
 		}
 		Ok(count)
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default, clap::ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum Priority {
+	Low,
+	#[default]
+	Normal,
+	High,
+	Urgent,
+}
+
+impl Store {
+	pub fn set_priority(&mut self, id: u64, priority: Priority) -> Result<Task> {
+		let task = self.get_mut(id)?;
+		task.priority = priority;
+		Ok(task.clone())
 	}
 }
