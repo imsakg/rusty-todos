@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "next_id": 5,
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Review release",
+      "status": "open",
+      "category": "work",
+      "priority": "high",
+      "due": "2024-06-10",
+      "reminder": "2024-06-10T18:00:00Z",
+      "reminder_dismissed": false
+    },
+    {
+      "id": 2,
+      "title": "Buy café, tea",
+      "status": "done",
+      "category": null,
+      "priority": "normal",
+      "due": null,
+      "reminder": null,
+      "reminder_dismissed": false
+    }
+  ]
+}

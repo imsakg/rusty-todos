@@ -437,3 +437,27 @@ fn terminal_control_sequences_are_rejected_at_all_title_boundaries() {
 	}
 	assert!(validate_title("valid\nmultiline\ttext").is_ok());
 }
+
+#[test]
+fn published_fixture_restores_metadata_and_deleted_id_history() {
+	let data = include_str!("fixtures/version1.json");
+	let mut store = Store::from_json(data).unwrap();
+	assert_eq!(store.tasks().len(), 2);
+	assert_eq!(
+		store.query(&Query {
+			status: Some(Status::Open),
+			..Default::default()
+		})[0]
+			.title,
+		"Review release"
+	);
+	assert_eq!(
+		store.pending_reminders("2024-06-10T18:00:00Z".parse().unwrap()).len(),
+		1
+	);
+	assert_eq!(store.create("next after deleted ids").unwrap().id, 5);
+	assert_eq!(Store::from_json(&store.export_json().unwrap()).unwrap(), store);
+	let mut invalid: serde_json::Value = serde_json::from_str(data).unwrap();
+	invalid["tasks"][1]["id"] = 1.into();
+	assert!(Store::from_json(&invalid.to_string()).is_err());
+}
