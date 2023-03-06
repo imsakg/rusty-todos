@@ -1,0 +1,37 @@
+name: Rust
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  local-cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Formatting
+        run: cargo fmt --manifest-path backend/Cargo.toml -- --check
+      - name: Lint local application and tests
+        run: cargo clippy --manifest-path backend/Cargo.toml --all-targets --locked -- -D warnings
+      - name: Database-free tests
+        run: cargo test --manifest-path backend/Cargo.toml --all-targets --locked
+
+  legacy-server-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Preserve legacy server build compatibility
+        run: cargo check --manifest-path backend/Cargo.toml --features server --bin rusty_todos --locked
+      - name: Compile opt-in PostgreSQL tests without touching a database
+        run: cargo test --manifest-path backend/Cargo.toml --features postgres-tests --bin rusty_todos --locked --no-run
