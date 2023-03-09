@@ -555,3 +555,11 @@ impl Store {
 		stats
 	}
 }
+
+impl Store {
+	pub fn clear_completed(&mut self) -> usize {
+		let before = self.tasks.len();
+		self.tasks.retain(|task| task.status != Status::Done);
+		before - self.tasks.len()
+	}
+}

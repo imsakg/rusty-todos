@@ -101,3 +101,15 @@ fn reminder_commands_use_explicit_time_and_do_not_redeliver_dismissed_items() {
     assert!(serde_json::from_slice::<Vec<serde_json::Value>>(&pending.stdout).unwrap().is_empty());
     assert!(cli(&path, &["reminder", "clear", "1"]).status.success());
 }
+
+#[test]
+fn statistics_and_confirmed_cleanup_are_available() {
+    let dir = tempfile::tempdir().unwrap(); let path = dir.path().join("todos.json");
+    cli(&path, &["add", "finish"]); cli(&path, &["done", "1"]);
+    let stats = cli(&path, &["stats", "--as-of", "2024-06-03"]);
+    assert!(stats.status.success());
+    assert_eq!(serde_json::from_slice::<serde_json::Value>(&stats.stdout).unwrap()["done"], 1);
+    assert!(!cli(&path, &["clear-done"]).status.success());
+    assert!(cli(&path, &["clear-done", "--yes"]).status.success());
+    assert!(serde_json::from_slice::<Vec<serde_json::Value>>(&cli(&path, &["list"]).stdout).unwrap().is_empty());
+}

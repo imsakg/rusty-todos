@@ -14,6 +14,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Action {
+	/// Summarize all tasks; overdue uses UTC today unless --as-of is supplied.
+	Stats {
+		#[arg(long, value_parser = parse_date)]
+		as_of: Option<NaiveDate>,
+	},
+	/// Permanently remove completed tasks, preserving the id sequence.
+	ClearDone {
+		#[arg(long)]
+		yes: bool,
+	},
 	/// Schedule, poll, acknowledge or clear reminders (no daemon).
 	Reminder {
 		#[command(subcommand)]
@@ -91,6 +101,16 @@ enum CategoryAction {
 fn execute(cli: Cli) -> Result<()> {
 	let mut store = Store::load(&cli.data)?;
 	let (output, changed) = match cli.command {
+		Action::Stats { as_of } => (
+			serde_json::to_value(store.statistics(as_of.unwrap_or_else(|| Utc::now().date_naive())))?,
+			false,
+		),
+		Action::ClearDone { yes } => {
+			if !yes {
+				return Err(Error::Invalid("clear-done requires --yes".into()));
+			}
+			(serde_json::json!({"deleted": store.clear_completed()}), true)
+		}
 		Action::Reminder { command } => match command {
 			ReminderAction::List { now } => (
 				serde_json::to_value(store.pending_reminders(now.unwrap_or_else(Utc::now)))?,

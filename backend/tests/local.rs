@@ -368,3 +368,15 @@ fn statistics_count_open_overdue_and_grouped_tasks() {
 	assert_eq!(stats.by_category["work"], 1);
 	assert_eq!(stats.by_priority[&Priority::High], 1);
 }
+
+#[test]
+fn clearing_completed_tasks_preserves_open_work_and_the_id_allocator() {
+	let mut store = Store::default();
+	store.create("open").unwrap();
+	store.create("done").unwrap();
+	store.set_status(2, Status::Done).unwrap();
+	assert_eq!(store.clear_completed(), 1);
+	assert_eq!(store.clear_completed(), 0);
+	assert_eq!(store.tasks().len(), 1);
+	assert_eq!(store.create("next").unwrap().id, 3);
+}
