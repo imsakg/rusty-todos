@@ -85,3 +85,17 @@ fn saves_create_parent_directories_and_replace_complete_files() {
 	assert_eq!(std::fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
 	assert!(store.save(dir.path()).is_err());
 }
+
+#[test]
+fn category_assignment_is_optional_trimmed_and_validated() {
+	let mut store = Store::default();
+	store.create("work item").unwrap();
+	assert_eq!(
+		store.set_category(1, Some(" work ")).unwrap().category.as_deref(),
+		Some("work")
+	);
+	assert!(store.set_category(1, Some(" ")).is_err());
+	assert_eq!(store.get(1).unwrap().category.as_deref(), Some("work"));
+	assert_eq!(store.set_category(1, None).unwrap().category, None);
+	assert!(store.set_category(99, Some("work")).is_err());
+}

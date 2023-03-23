@@ -38,6 +38,8 @@ pub struct Task {
 	pub id: u64,
 	pub title: String,
 	pub status: Status,
+	#[serde(default)]
+	pub category: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,6 +66,7 @@ impl Store {
 			id: self.next_id,
 			title,
 			status: Status::Open,
+			category: None,
 		};
 		self.tasks.push(task.clone());
 		self.next_id = next;
@@ -120,6 +123,11 @@ impl Store {
 	fn validate(&self) -> Result<()> {
 		let mut ids = std::collections::HashSet::new();
 		for task in &self.tasks {
+			if let Some(category) = &task.category {
+				if validate_category(category)? != *category {
+					return Err(Error::Invalid("stored categories must be trimmed".into()));
+				}
+			}
 			if task.id == 0 || task.id >= self.next_id || !ids.insert(task.id) {
 				return Err(Error::Invalid("duplicate, zero or out-of-range todo id".into()));
 			}
@@ -163,5 +171,22 @@ impl Store {
 		#[cfg(unix)]
 		std::fs::File::open(parent)?.sync_all()?;
 		Ok(())
+	}
+}
+
+pub fn validate_category(name: &str) -> Result<String> {
+	let name = name.trim();
+	if name.is_empty() || name.chars().count() > 64 || name.chars().any(char::is_control) {
+		return Err(Error::Invalid("category must contain 1–64 printable characters".into()));
+	}
+	Ok(name.to_owned())
+}
+
+impl Store {
+	pub fn set_category(&mut self, id: u64, name: Option<&str>) -> Result<Task> {
+		let category = name.map(validate_category).transpose()?;
+		let task = self.get_mut(id)?;
+		task.category = category;
+		Ok(task.clone())
 	}
 }
