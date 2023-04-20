@@ -160,3 +160,30 @@ fn reminders_respect_time_completion_and_acknowledgment() {
 	store.set_reminder(1, None).unwrap();
 	assert!(store.dismiss_reminder(1).is_err());
 }
+
+#[test]
+fn query_combines_status_category_and_priority_filters() {
+	let mut store = Store::default();
+	store.create("a").unwrap();
+	store.create("b").unwrap();
+	store.create("c").unwrap();
+	store.set_category(1, Some("work")).unwrap();
+	store.set_category(2, Some("work")).unwrap();
+	store.set_priority(1, Priority::High).unwrap();
+	store.set_status(2, Status::Done).unwrap();
+	let query = Query {
+		status: Some(Status::Open),
+		category: Some("work".into()),
+		priority: Some(Priority::High),
+		..Default::default()
+	};
+	assert_eq!(store.query(&query).iter().map(|t| t.id).collect::<Vec<_>>(), vec![1]);
+	assert_eq!(
+		store.query(&Query {
+			uncategorized: true,
+			..Default::default()
+		})[0]
+			.id,
+		3
+	);
+}

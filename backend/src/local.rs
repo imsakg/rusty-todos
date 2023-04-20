@@ -314,3 +314,28 @@ impl Store {
 		tasks
 	}
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct Query {
+	pub status: Option<Status>,
+	pub category: Option<String>,
+	pub uncategorized: bool,
+	pub priority: Option<Priority>,
+}
+
+impl Store {
+	pub fn query(&self, query: &Query) -> Vec<&Task> {
+		self.tasks
+			.iter()
+			.filter(|task| {
+				query.status.is_none_or(|status| task.status == status)
+					&& query
+						.category
+						.as_ref()
+						.is_none_or(|category| task.category.as_ref() == Some(category))
+					&& (!query.uncategorized || task.category.is_none())
+					&& query.priority.is_none_or(|priority| task.priority == priority)
+			})
+			.collect()
+	}
+}
