@@ -69,3 +69,22 @@ fn list_filters_sorts_and_pages_the_stored_tasks() {
     assert_eq!(serde_json::from_slice::<Vec<serde_json::Value>>(&overdue.stdout).unwrap().len(), 1);
     assert!(!cli(&path, &["list", "--category", "work", "--uncategorized"]).status.success());
 }
+
+#[test]
+fn backup_commands_round_trip_without_silent_overwrites() {
+    let dir = tempfile::tempdir().unwrap(); let path = dir.path().join("source.json");
+    let target = dir.path().join("restored.json"); let backup = dir.path().join("backup.json");
+    cli(&path, &["add", "backup me"]);
+    let exported = cli(&path, &["export"]);
+    assert!(exported.status.success());
+    std::fs::write(&backup, &exported.stdout).unwrap();
+    assert!(cli(&target, &["import", backup.to_str().unwrap()]).status.success());
+    assert!(!cli(&target, &["import", backup.to_str().unwrap()]).status.success());
+    assert!(!cli(&target, &["import", backup.to_str().unwrap(), "--mode", "replace"]).status.success());
+    assert!(cli(&target, &["import", backup.to_str().unwrap(), "--mode", "replace", "--yes"]).status.success());
+    assert!(!cli(&path, &["export", "--output", backup.to_str().unwrap()]).status.success());
+    let csv = dir.path().join("backup.csv");
+    assert!(cli(&path, &["export", "--format", "csv", "--output", csv.to_str().unwrap()]).status.success());
+    let other = dir.path().join("other.json");
+    assert!(cli(&other, &["import", csv.to_str().unwrap(), "--format", "csv"]).status.success());
+}

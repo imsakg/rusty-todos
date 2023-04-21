@@ -1,6 +1,6 @@
 use chrono::{NaiveDate, Utc};
 use clap::{Parser, Subcommand};
-use rusty_todos::local::{parse_date, Error, Priority, Query, Result, SortField, Status, Store};
+use rusty_todos::local::{parse_date, Error, ImportMode, Priority, Query, Result, SortField, Status, Store};
 use std::{path::PathBuf, process::ExitCode};
 
 #[derive(Parser)]
@@ -14,6 +14,24 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Action {
+	/// Export a complete backup to stdout or a new file.
+	Export {
+		#[arg(long, value_enum, default_value = "json")]
+		format: DataFormat,
+		#[arg(long)]
+		output: Option<PathBuf>,
+	},
+	/// Import a backup; merge rejects id conflicts.
+	Import {
+		input: PathBuf,
+		#[arg(long, value_enum, default_value = "json")]
+		format: DataFormat,
+		#[arg(long, value_enum, default_value = "merge")]
+		mode: ImportMode,
+		/// Required to replace the complete store.
+		#[arg(long)]
+		yes: bool,
+	},
 	/// Change optional task metadata atomically.
 	Set {
 		id: u64,
@@ -68,6 +86,38 @@ enum CategoryAction {
 fn execute(cli: Cli) -> Result<()> {
 	let mut store = Store::load(&cli.data)?;
 	let (output, changed) = match cli.command {
+		Action::Export { format, output } => {
+			let data = match format {
+				DataFormat::Json => store.export_json()?,
+				DataFormat::Csv => store.export_csv()?,
+			};
+			if let Some(path) = output {
+				use std::io::Write;
+				let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(path)?;
+				file.write_all(data.as_bytes())?;
+				file.sync_all()?;
+				(serde_json::json!({"exported": store.tasks().len()}), false)
+			} else {
+				print!("{data}");
+				return Ok(());
+			}
+		}
+		Action::Import {
+			input,
+			format,
+			mode,
+			yes,
+		} => {
+			if matches!(mode, ImportMode::Replace) && !yes {
+				return Err(Error::Invalid("replace requires --yes; export a backup first".into()));
+			}
+			let data = std::fs::read_to_string(input)?;
+			let summary = match format {
+				DataFormat::Json => store.import_json(&data, mode)?,
+				DataFormat::Csv => store.import_csv(&data, mode)?,
+			};
+			(serde_json::to_value(summary)?, true)
+		}
 		Action::Set {
 			id,
 			priority,
@@ -165,4 +215,10 @@ impl ListArgs {
 			limit: self.limit,
 		}
 	}
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
+enum DataFormat {
+	Json,
+	Csv,
 }
