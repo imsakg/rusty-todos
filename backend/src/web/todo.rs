@@ -89,7 +89,7 @@ fn json_response<D: Serialize>(data: D) -> Result<Json, warp::Rejection> {
 /* #endregion */
 
 /* #region  Test */
-#[cfg(test)]
+#[cfg(all(test, feature = "postgres-tests"))]
 #[path = "../_tests/web_todo.rs"]
 mod tests;
 /* #endregion */

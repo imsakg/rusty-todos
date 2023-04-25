@@ -76,6 +76,6 @@ async fn new_db_pool(host: &str, db: &str, user: &str, pwd: &str, max_con: u32) 
 		.await
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "postgres-tests"))]
 #[path = "../_tests/model_db.rs"]
 mod tests;

@@ -118,6 +118,6 @@ fn handle_fetch_one_result(
 }
 /* #endregion */
 
-#[cfg(test)]
+#[cfg(all(test, feature = "postgres-tests"))]
 #[path = "../_tests/model_todo.rs"]
 mod tests;
