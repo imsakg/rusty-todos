@@ -46,3 +46,13 @@ fn deleted_ids_are_not_recycled() {
 	assert!(store.delete(task.id).is_err());
 	assert_eq!(store.create("next").unwrap().id, 2);
 }
+
+#[test]
+fn complete_and_reopen_are_idempotent() {
+	let mut store = Store::default();
+	let id = store.create("finish").unwrap().id;
+	assert_eq!(store.set_status(id, Status::Done).unwrap().status, Status::Done);
+	assert_eq!(store.set_status(id, Status::Done).unwrap().status, Status::Done);
+	assert_eq!(store.set_status(id, Status::Open).unwrap().status, Status::Open);
+	assert!(store.set_status(99, Status::Done).is_err());
+}

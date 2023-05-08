@@ -103,3 +103,11 @@ impl Store {
 		Ok(self.tasks.remove(index))
 	}
 }
+
+impl Store {
+	pub fn set_status(&mut self, id: u64, status: Status) -> Result<Task> {
+		let task = self.get_mut(id)?;
+		task.status = status;
+		Ok(task.clone())
+	}
+}
