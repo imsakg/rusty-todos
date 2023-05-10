@@ -71,3 +71,17 @@ fn disk_round_trip_preserves_ids_and_rejects_corruption() {
 	std::fs::write(&path, "not JSON").unwrap();
 	assert!(Store::load(&path).is_err());
 }
+
+#[test]
+fn saves_create_parent_directories_and_replace_complete_files() {
+	let dir = tempfile::tempdir().unwrap();
+	let path = dir.path().join("nested/todos.json");
+	let mut store = Store::default();
+	store.create("a long first title").unwrap();
+	store.save(&path).unwrap();
+	store.rename(1, "short").unwrap();
+	store.save(&path).unwrap();
+	assert_eq!(Store::load(&path).unwrap(), store);
+	assert_eq!(std::fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
+	assert!(store.save(dir.path()).is_err());
+}

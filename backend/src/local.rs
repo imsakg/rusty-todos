@@ -148,7 +148,20 @@ impl Store {
 	pub fn save(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
 		self.validate()?;
 		let data = serde_json::to_vec_pretty(self)?;
-		std::fs::write(path, data)?;
+		use std::io::Write;
+		let path = path.as_ref();
+		let parent = path
+			.parent()
+			.filter(|p| !p.as_os_str().is_empty())
+			.unwrap_or(std::path::Path::new("."));
+		std::fs::create_dir_all(parent)?;
+		let mut file = tempfile::NamedTempFile::new_in(parent)?;
+		file.write_all(&data)?;
+		file.write_all(b"\n")?;
+		file.as_file().sync_all()?;
+		file.persist(path).map_err(|error| Error::Io(error.error))?;
+		#[cfg(unix)]
+		std::fs::File::open(parent)?.sync_all()?;
 		Ok(())
 	}
 }
