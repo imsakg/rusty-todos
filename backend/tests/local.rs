@@ -279,3 +279,22 @@ fn pagination_runs_after_sorting_and_handles_empty_pages() {
 		})
 		.is_empty());
 }
+
+#[test]
+fn json_exports_are_versioned_and_support_round_trips() {
+	let mut store = Store::default();
+	store.create("backup").unwrap();
+	store.set_category(1, Some("home")).unwrap();
+	let exported = store.export_json().unwrap();
+	assert_eq!(
+		serde_json::from_str::<serde_json::Value>(&exported).unwrap()["schema_version"],
+		1
+	);
+	assert_eq!(Store::from_json(&exported).unwrap(), store);
+	assert!(Store::from_json(&exported.replace("\"schema_version\": 1", "\"schema_version\": 2")).is_err());
+	let legacy = r#"{"next_id":2,"tasks":[{"id":1,"title":"old","status":"open"}]}"#;
+	assert_eq!(
+		Store::from_json(legacy).unwrap().get(1).unwrap().priority,
+		Priority::Normal
+	);
+}

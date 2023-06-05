@@ -54,6 +54,8 @@ pub struct Task {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Store {
+	#[serde(default = "schema_version")]
+	schema_version: u32,
 	next_id: u64,
 	tasks: Vec<Task>,
 }
@@ -61,6 +63,7 @@ pub struct Store {
 impl Default for Store {
 	fn default() -> Self {
 		Self {
+			schema_version: 1,
 			next_id: 1,
 			tasks: Vec::new(),
 		}
@@ -134,6 +137,12 @@ impl Store {
 
 impl Store {
 	fn validate(&self) -> Result<()> {
+		if self.schema_version != 1 {
+			return Err(Error::Invalid(format!(
+				"unsupported schema version {}",
+				self.schema_version
+			)));
+		}
 		let mut ids = std::collections::HashSet::new();
 		for task in &self.tasks {
 			if let Some(category) = &task.category {
@@ -385,4 +394,21 @@ pub enum SortField {
 	Title,
 	Priority,
 	Due,
+}
+
+fn schema_version() -> u32 {
+	1
+}
+
+impl Store {
+	pub fn from_json(data: &str) -> Result<Self> {
+		let store: Self = serde_json::from_str(data)?;
+		store.validate()?;
+		Ok(store)
+	}
+
+	pub fn export_json(&self) -> Result<String> {
+		self.validate()?;
+		Ok(format!("{}\n", serde_json::to_string_pretty(self)?))
+	}
 }
