@@ -45,6 +45,10 @@ pub struct Task {
 	pub priority: Priority,
 	#[serde(default)]
 	pub due: Option<NaiveDate>,
+	#[serde(default)]
+	pub reminder: Option<DateTime<Utc>>,
+	#[serde(default)]
+	pub reminder_dismissed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,6 +78,8 @@ impl Store {
 			category: None,
 			priority: Priority::Normal,
 			due: None,
+			reminder: None,
+			reminder_dismissed: false,
 		};
 		self.tasks.push(task.clone());
 		self.next_id = next;
@@ -276,5 +282,35 @@ impl Store {
 		let task = self.get_mut(id)?;
 		task.due = due;
 		Ok(task.clone())
+	}
+}
+
+impl Store {
+	pub fn set_reminder(&mut self, id: u64, reminder: Option<DateTime<Utc>>) -> Result<Task> {
+		let task = self.get_mut(id)?;
+		task.reminder = reminder;
+		task.reminder_dismissed = false;
+		Ok(task.clone())
+	}
+
+	pub fn dismiss_reminder(&mut self, id: u64) -> Result<Task> {
+		let task = self.get_mut(id)?;
+		if task.reminder.is_none() {
+			return Err(Error::Invalid("todo has no reminder".into()));
+		}
+		task.reminder_dismissed = true;
+		Ok(task.clone())
+	}
+
+	pub fn pending_reminders(&self, now: DateTime<Utc>) -> Vec<&Task> {
+		let mut tasks: Vec<_> = self
+			.tasks
+			.iter()
+			.filter(|task| {
+				task.status == Status::Open && !task.reminder_dismissed && task.reminder.is_some_and(|at| at <= now)
+			})
+			.collect();
+		tasks.sort_by_key(|task| (task.reminder, task.id));
+		tasks
 	}
 }

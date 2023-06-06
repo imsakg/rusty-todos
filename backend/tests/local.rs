@@ -139,3 +139,24 @@ fn due_dates_can_be_set_and_cleared_with_leap_day_validation() {
 	assert_eq!(store.set_due(1, Some(due)).unwrap().due, Some(due));
 	assert_eq!(store.set_due(1, None).unwrap().due, None);
 }
+
+#[test]
+fn reminders_respect_time_completion_and_acknowledgment() {
+	let mut store = Store::default();
+	store.create("remind me").unwrap();
+	let now = "2024-06-03T18:00:00Z".parse().unwrap();
+	store.set_reminder(1, Some(now)).unwrap();
+	assert!(store
+		.pending_reminders("2024-06-03T17:59:59Z".parse().unwrap())
+		.is_empty());
+	assert_eq!(store.pending_reminders(now).len(), 1);
+	store.set_status(1, Status::Done).unwrap();
+	assert!(store.pending_reminders(now).is_empty());
+	store.set_status(1, Status::Open).unwrap();
+	store.dismiss_reminder(1).unwrap();
+	assert!(store.pending_reminders(now).is_empty());
+	store.set_reminder(1, Some(now)).unwrap();
+	assert_eq!(store.pending_reminders(now).len(), 1);
+	store.set_reminder(1, None).unwrap();
+	assert!(store.dismiss_reminder(1).is_err());
+}
