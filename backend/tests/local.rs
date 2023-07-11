@@ -380,3 +380,27 @@ fn clearing_completed_tasks_preserves_open_work_and_the_id_allocator() {
 	assert_eq!(store.tasks().len(), 1);
 	assert_eq!(store.create("next").unwrap().id, 3);
 }
+
+#[test]
+fn exclusive_store_locks_are_released_when_the_guard_is_dropped() {
+	let dir = tempfile::tempdir().unwrap();
+	let path = dir.path().join("nested/todos.json");
+	let first = StoreLock::acquire(&path).unwrap();
+	assert!(StoreLock::acquire(&path).is_err());
+	drop(first);
+	assert!(StoreLock::acquire(&path).is_ok());
+}
+
+#[cfg(unix)]
+#[test]
+fn data_symlinks_are_rejected_instead_of_splitting_the_store() {
+	let dir = tempfile::tempdir().unwrap();
+	let real = dir.path().join("real.json");
+	let alias = dir.path().join("alias.json");
+	let store = Store::default();
+	store.save(&real).unwrap();
+	std::os::unix::fs::symlink(&real, &alias).unwrap();
+	assert!(Store::load(&alias).is_err());
+	assert!(store.save(&alias).is_err());
+	assert!(std::fs::symlink_metadata(&alias).unwrap().file_type().is_symlink());
+}

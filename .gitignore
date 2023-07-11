@@ -13,3 +13,6 @@
 
 # installed node modules
 */node_modules/
+# Local CLI state (choose an explicit path outside the checkout for real data).
+rusty-todos.json
+rusty-todos.json.lock

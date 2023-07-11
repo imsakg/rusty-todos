@@ -166,6 +166,8 @@ impl Store {
 	}
 
 	pub fn load(path: impl AsRef<std::path::Path>) -> Result<Self> {
+		let path = path.as_ref();
+		ensure_regular_path(path)?;
 		match std::fs::File::open(path) {
 			Ok(file) => {
 				let store: Self = serde_json::from_reader(file)?;
@@ -178,6 +180,7 @@ impl Store {
 	}
 
 	pub fn save(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
+		ensure_regular_path(path.as_ref())?;
 		self.validate()?;
 		let data = serde_json::to_vec_pretty(self)?;
 		use std::io::Write;
@@ -561,5 +564,58 @@ impl Store {
 		let before = self.tasks.len();
 		self.tasks.retain(|task| task.status != Status::Done);
 		before - self.tasks.len()
+	}
+}
+
+fn ensure_regular_path(path: &std::path::Path) -> Result<()> {
+	match std::fs::symlink_metadata(path) {
+		Ok(metadata) if !metadata.file_type().is_file() => Err(Error::Invalid(
+			"data and lock paths must be regular files, not symlinks or directories".into(),
+		)),
+		Ok(_) => Ok(()),
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+		Err(error) => Err(error.into()),
+	}
+}
+
+/// Keep this guard alive for the entire load/edit/save transaction.
+/// The sidecar remains on disk; closing its descriptor releases the OS lock.
+pub struct StoreLock {
+	_file: std::fs::File,
+}
+
+impl StoreLock {
+	pub fn acquire(path: impl AsRef<std::path::Path>) -> Result<Self> {
+		use fs2::FileExt;
+		let path = path.as_ref();
+		ensure_regular_path(path)?;
+		let mut name = path
+			.file_name()
+			.ok_or_else(|| Error::Invalid("data path needs a filename".into()))?
+			.to_os_string();
+		name.push(".lock");
+		let lock_path = path.with_file_name(name);
+		let parent = lock_path
+			.parent()
+			.filter(|p| !p.as_os_str().is_empty())
+			.unwrap_or(std::path::Path::new("."));
+		std::fs::create_dir_all(parent)?;
+		ensure_regular_path(&lock_path)?;
+		let mut options = std::fs::OpenOptions::new();
+		options.read(true).write(true).create(true).truncate(false);
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::OpenOptionsExt;
+			options.mode(0o600);
+		}
+		let file = options.open(&lock_path)?;
+		file.try_lock_exclusive().map_err(|error| {
+			if error.kind() == std::io::ErrorKind::WouldBlock {
+				Error::Invalid("todo store is locked by another process; retry shortly".into())
+			} else {
+				Error::Io(error)
+			}
+		})?;
+		Ok(Self { _file: file })
 	}
 }

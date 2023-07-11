@@ -1,6 +1,6 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use clap::{Parser, Subcommand};
-use rusty_todos::local::{parse_date, Error, ImportMode, Priority, Query, Result, SortField, Status, Store};
+use rusty_todos::local::{parse_date, Error, ImportMode, Priority, Query, Result, SortField, Status, Store, StoreLock};
 use std::{path::PathBuf, process::ExitCode};
 
 #[derive(Parser)]
@@ -99,6 +99,7 @@ enum CategoryAction {
 }
 
 fn execute(cli: Cli) -> Result<()> {
+	let _lock = StoreLock::acquire(&cli.data)?;
 	let mut store = Store::load(&cli.data)?;
 	let (output, changed) = match cli.command {
 		Action::Stats { as_of } => (
