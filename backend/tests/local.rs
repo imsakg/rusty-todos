@@ -36,3 +36,13 @@ fn rename_is_validated_before_mutating_the_task() {
 	assert_eq!(store.rename(id, " after ").unwrap().title, "after");
 	assert!(store.rename(99, "missing").is_err());
 }
+
+#[test]
+fn deleted_ids_are_not_recycled() {
+	let mut store = Store::default();
+	let task = store.create("temporary").unwrap();
+	assert_eq!(store.delete(task.id).unwrap(), task);
+	assert!(store.get(task.id).is_err());
+	assert!(store.delete(task.id).is_err());
+	assert_eq!(store.create("next").unwrap().id, 2);
+}

@@ -92,3 +92,14 @@ impl Store {
 		Ok(task.clone())
 	}
 }
+
+impl Store {
+	pub fn delete(&mut self, id: u64) -> Result<Task> {
+		let index = self
+			.tasks
+			.iter()
+			.position(|task| task.id == id)
+			.ok_or(Error::NotFound(id))?;
+		Ok(self.tasks.remove(index))
+	}
+}
