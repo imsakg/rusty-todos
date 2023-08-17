@@ -29,7 +29,7 @@ enum Action {
 		#[command(subcommand)]
 		command: ReminderAction,
 	},
-	/// Export a complete backup to stdout or a new file.
+	/// Export a complete JSON backup or CSV exchange data to stdout/a new file.
 	Export {
 		#[arg(long, value_enum, default_value = "json")]
 		format: DataFormat,
