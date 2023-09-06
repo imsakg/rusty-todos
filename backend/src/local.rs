@@ -1,0 +1,53 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+	#[error("invalid input: {0}")]
+	Invalid(String),
+	#[error("todo {0} was not found")]
+	NotFound(u64),
+	#[error("todo identifiers are exhausted")]
+	IdExhausted,
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+pub fn validate_title(title: &str) -> Result<String> {
+	let title = title.trim();
+	if title.is_empty() || title.chars().count() > 500 {
+		return Err(Error::Invalid("title must contain 1–500 characters".into()));
+	}
+	Ok(title.to_owned())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Status {
+	#[default]
+	Open,
+	Done,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Task {
+	pub id: u64,
+	pub title: String,
+	pub status: Status,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Store {
+	next_id: u64,
+	tasks: Vec<Task>,
+}
+
+impl Default for Store {
+	fn default() -> Self {
+		Self {
+			next_id: 1,
+			tasks: Vec::new(),
+		}
+	}
+}
