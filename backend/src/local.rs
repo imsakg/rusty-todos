@@ -27,7 +27,7 @@ pub fn validate_title(title: &str) -> Result<String> {
 	Ok(title.to_owned())
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, clap::ValueEnum)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {
 	#[default]

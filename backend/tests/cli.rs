@@ -55,3 +55,17 @@ fn priority_and_due_updates_are_validated_before_saving() {
     assert!(cli(&path, &["set", "1", "--clear-due"]).status.success());
     assert!(!cli(&path, &["set", "1"]).status.success());
 }
+
+#[test]
+fn list_filters_sorts_and_pages_the_stored_tasks() {
+    let dir = tempfile::tempdir().unwrap(); let path = dir.path().join("todos.json");
+    cli(&path, &["add", "Report Z"]); cli(&path, &["add", "report A"]);
+    cli(&path, &["set", "2", "--due", "2024-06-01", "--priority", "high"]);
+    let output = cli(&path, &["list", "--status", "open", "--search", "REPORT", "--sort", "title", "--limit", "1"]);
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let rows: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(rows[0]["id"], 2);
+    let overdue = cli(&path, &["list", "--overdue", "--as-of", "2024-06-03", "--priority", "high"]);
+    assert_eq!(serde_json::from_slice::<Vec<serde_json::Value>>(&overdue.stdout).unwrap().len(), 1);
+    assert!(!cli(&path, &["list", "--category", "work", "--uncategorized"]).status.success());
+}

@@ -1,6 +1,6 @@
-use chrono::NaiveDate;
+use chrono::{NaiveDate, Utc};
 use clap::{Parser, Subcommand};
-use rusty_todos::local::{parse_date, Error, Priority, Result, Status, Store};
+use rusty_todos::local::{parse_date, Error, Priority, Query, Result, SortField, Status, Store};
 use std::{path::PathBuf, process::ExitCode};
 
 #[derive(Parser)]
@@ -27,7 +27,7 @@ enum Action {
 	/// Add a todo; quote titles containing spaces.
 	Add { title: String },
 	/// List todos as JSON.
-	List,
+	List(ListArgs),
 	/// Show one todo.
 	Show { id: u64 },
 	/// Rename a todo.
@@ -95,7 +95,7 @@ fn execute(cli: Cli) -> Result<()> {
 			CategoryAction::Remove { name } => (serde_json::json!({"updated": store.remove_category(&name)?}), true),
 		},
 		Action::Add { title } => (serde_json::to_value(store.create(&title)?)?, true),
-		Action::List => (serde_json::to_value(store.tasks())?, false),
+		Action::List(args) => (serde_json::to_value(store.query(&args.query()))?, false),
 		Action::Show { id } => (serde_json::to_value(store.get(id)?)?, false),
 		Action::Edit { id, title } => (serde_json::to_value(store.rename(id, &title)?)?, true),
 		Action::Delete { id } => (serde_json::to_value(store.delete(id)?)?, true),
@@ -115,6 +115,54 @@ fn main() -> ExitCode {
 		Err(error) => {
 			eprintln!("error: {error}");
 			ExitCode::FAILURE
+		}
+	}
+}
+
+#[derive(clap::Args)]
+struct ListArgs {
+	#[arg(long, value_enum)]
+	status: Option<Status>,
+	#[arg(long, conflicts_with = "uncategorized")]
+	category: Option<String>,
+	#[arg(long)]
+	uncategorized: bool,
+	#[arg(long, value_enum)]
+	priority: Option<Priority>,
+	#[arg(long)]
+	search: Option<String>,
+	#[arg(long, value_parser = parse_date)]
+	due_before: Option<NaiveDate>,
+	#[arg(long)]
+	overdue: bool,
+	#[arg(long, requires = "overdue", value_parser = parse_date)]
+	as_of: Option<NaiveDate>,
+	#[arg(long, value_enum, default_value = "id")]
+	sort: SortField,
+	#[arg(long)]
+	desc: bool,
+	#[arg(long, default_value_t = 0)]
+	offset: usize,
+	#[arg(long)]
+	limit: Option<usize>,
+}
+
+impl ListArgs {
+	fn query(self) -> Query {
+		Query {
+			status: self.status,
+			category: self.category,
+			uncategorized: self.uncategorized,
+			priority: self.priority,
+			search: self.search,
+			due_before: self.due_before,
+			overdue_as_of: self
+				.overdue
+				.then(|| self.as_of.unwrap_or_else(|| Utc::now().date_naive())),
+			sort: self.sort,
+			descending: self.desc,
+			offset: self.offset,
+			limit: self.limit,
 		}
 	}
 }
