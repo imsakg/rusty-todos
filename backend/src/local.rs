@@ -1,3 +1,4 @@
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, thiserror::Error)]
@@ -42,6 +43,8 @@ pub struct Task {
 	pub category: Option<String>,
 	#[serde(default)]
 	pub priority: Priority,
+	#[serde(default)]
+	pub due: Option<NaiveDate>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -70,6 +73,7 @@ impl Store {
 			status: Status::Open,
 			category: None,
 			priority: Priority::Normal,
+			due: None,
 		};
 		self.tasks.push(task.clone());
 		self.next_id = next;
@@ -254,6 +258,23 @@ impl Store {
 	pub fn set_priority(&mut self, id: u64, priority: Priority) -> Result<Task> {
 		let task = self.get_mut(id)?;
 		task.priority = priority;
+		Ok(task.clone())
+	}
+}
+
+pub fn parse_date(value: &str) -> Result<NaiveDate> {
+	let date = NaiveDate::parse_from_str(value, "%Y-%m-%d")
+		.map_err(|_| Error::Invalid("date must be a real YYYY-MM-DD date".into()))?;
+	if date.format("%Y-%m-%d").to_string() != value {
+		return Err(Error::Invalid("date must use YYYY-MM-DD".into()));
+	}
+	Ok(date)
+}
+
+impl Store {
+	pub fn set_due(&mut self, id: u64, due: Option<NaiveDate>) -> Result<Task> {
+		let task = self.get_mut(id)?;
+		task.due = due;
 		Ok(task.clone())
 	}
 }

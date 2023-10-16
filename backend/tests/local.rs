@@ -128,3 +128,14 @@ fn priorities_default_to_normal_and_serialize_as_names() {
 	assert!(serde_json::from_str::<Priority>("\"impossible\"").is_err());
 	assert!(store.set_priority(99, Priority::Low).is_err());
 }
+
+#[test]
+fn due_dates_can_be_set_and_cleared_with_leap_day_validation() {
+	let mut store = Store::default();
+	store.create("scheduled").unwrap();
+	let due = parse_date("2024-02-29").unwrap();
+	assert!(parse_date("2023-02-29").is_err());
+	assert!(parse_date("2024-2-9").is_err());
+	assert_eq!(store.set_due(1, Some(due)).unwrap().due, Some(due));
+	assert_eq!(store.set_due(1, None).unwrap().due, None);
+}
