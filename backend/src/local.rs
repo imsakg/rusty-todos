@@ -8,6 +8,10 @@ pub enum Error {
 	NotFound(u64),
 	#[error("todo identifiers are exhausted")]
 	IdExhausted,
+	#[error(transparent)]
+	Io(#[from] std::io::Error),
+	#[error(transparent)]
+	Json(#[from] serde_json::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -109,5 +113,42 @@ impl Store {
 		let task = self.get_mut(id)?;
 		task.status = status;
 		Ok(task.clone())
+	}
+}
+
+impl Store {
+	fn validate(&self) -> Result<()> {
+		let mut ids = std::collections::HashSet::new();
+		for task in &self.tasks {
+			if task.id == 0 || task.id >= self.next_id || !ids.insert(task.id) {
+				return Err(Error::Invalid("duplicate, zero or out-of-range todo id".into()));
+			}
+			if validate_title(&task.title)? != task.title {
+				return Err(Error::Invalid("stored titles must be trimmed".into()));
+			}
+		}
+		if self.next_id == 0 {
+			return Err(Error::Invalid("next_id must be positive".into()));
+		}
+		Ok(())
+	}
+
+	pub fn load(path: impl AsRef<std::path::Path>) -> Result<Self> {
+		match std::fs::File::open(path) {
+			Ok(file) => {
+				let store: Self = serde_json::from_reader(file)?;
+				store.validate()?;
+				Ok(store)
+			}
+			Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
+			Err(error) => Err(error.into()),
+		}
+	}
+
+	pub fn save(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
+		self.validate()?;
+		let data = serde_json::to_vec_pretty(self)?;
+		std::fs::write(path, data)?;
+		Ok(())
 	}
 }

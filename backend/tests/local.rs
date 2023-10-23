@@ -56,3 +56,18 @@ fn complete_and_reopen_are_idempotent() {
 	assert_eq!(store.set_status(id, Status::Open).unwrap().status, Status::Open);
 	assert!(store.set_status(99, Status::Done).is_err());
 }
+
+#[test]
+fn disk_round_trip_preserves_ids_and_rejects_corruption() {
+	let dir = tempfile::tempdir().unwrap();
+	let path = dir.path().join("todos.json");
+	assert!(Store::load(&path).unwrap().tasks().is_empty());
+	let mut store = Store::default();
+	store.create("persist me").unwrap();
+	store.save(&path).unwrap();
+	let mut loaded = Store::load(&path).unwrap();
+	assert_eq!(loaded, store);
+	assert_eq!(loaded.create("second").unwrap().id, 2);
+	std::fs::write(&path, "not JSON").unwrap();
+	assert!(Store::load(&path).is_err());
+}
