@@ -26,3 +26,13 @@ fn get_and_list_return_only_existing_tasks() {
 	assert_eq!(store.tasks(), &[task]);
 	assert!(matches!(store.get(999), Err(Error::NotFound(999))));
 }
+
+#[test]
+fn rename_is_validated_before_mutating_the_task() {
+	let mut store = Store::default();
+	let id = store.create("before").unwrap().id;
+	assert!(store.rename(id, " ").is_err());
+	assert_eq!(store.get(id).unwrap().title, "before");
+	assert_eq!(store.rename(id, " after ").unwrap().title, "after");
+	assert!(store.rename(99, "missing").is_err());
+}

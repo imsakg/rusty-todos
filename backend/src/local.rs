@@ -83,3 +83,12 @@ impl Store {
 			.ok_or(Error::NotFound(id))
 	}
 }
+
+impl Store {
+	pub fn rename(&mut self, id: u64, title: &str) -> Result<Task> {
+		let title = validate_title(title)?;
+		let task = self.get_mut(id)?;
+		task.title = title;
+		Ok(task.clone())
+	}
+}
