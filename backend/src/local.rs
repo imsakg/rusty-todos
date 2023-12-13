@@ -412,3 +412,54 @@ impl Store {
 		Ok(format!("{}\n", serde_json::to_string_pretty(self)?))
 	}
 }
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum ImportMode {
+	Merge,
+	Replace,
+	Remap,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ImportSummary {
+	pub imported: usize,
+}
+
+impl Store {
+	pub fn import_json(&mut self, data: &str, mode: ImportMode) -> Result<ImportSummary> {
+		self.import_store(Self::from_json(data)?, mode)
+	}
+
+	fn import_store(&mut self, incoming: Self, mode: ImportMode) -> Result<ImportSummary> {
+		incoming.validate()?;
+		let imported = incoming.tasks.len();
+		let mut candidate = self.clone();
+		match mode {
+			ImportMode::Replace => candidate = incoming,
+			ImportMode::Merge => {
+				if incoming
+					.tasks
+					.iter()
+					.any(|task| candidate.tasks.iter().any(|existing| task.id == existing.id))
+				{
+					return Err(Error::Invalid(
+						"import contains an existing id; choose remap or replace".into(),
+					));
+				}
+				candidate.next_id = candidate.next_id.max(incoming.next_id);
+				candidate.tasks.extend(incoming.tasks);
+			}
+			ImportMode::Remap => {
+				for mut task in incoming.tasks {
+					let next = candidate.next_id.checked_add(1).ok_or(Error::IdExhausted)?;
+					task.id = candidate.next_id;
+					candidate.next_id = next;
+					candidate.tasks.push(task);
+				}
+			}
+		}
+		candidate.validate()?;
+		*self = candidate;
+		Ok(ImportSummary { imported })
+	}
+}

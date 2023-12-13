@@ -298,3 +298,22 @@ fn json_exports_are_versioned_and_support_round_trips() {
 		Priority::Normal
 	);
 }
+
+#[test]
+fn json_imports_are_transactional_with_explicit_conflict_modes() {
+	let mut store = Store::default();
+	store.create("existing").unwrap();
+	let mut incoming = Store::default();
+	incoming.create("incoming").unwrap();
+	let data = incoming.export_json().unwrap();
+	let before = store.clone();
+	assert!(store.import_json(&data, ImportMode::Merge).is_err());
+	assert_eq!(store, before);
+	assert_eq!(store.import_json(&data, ImportMode::Remap).unwrap().imported, 1);
+	assert_eq!(store.get(2).unwrap().title, "incoming");
+	assert_eq!(store.import_json(&data, ImportMode::Replace).unwrap().imported, 1);
+	assert_eq!(store, incoming);
+	let invalid = data.replace("incoming", " ");
+	assert!(store.import_json(&invalid, ImportMode::Replace).is_err());
+	assert_eq!(store, incoming);
+}
