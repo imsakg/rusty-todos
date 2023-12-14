@@ -51,3 +51,18 @@ impl Default for Store {
 		}
 	}
 }
+
+impl Store {
+	pub fn create(&mut self, title: &str) -> Result<Task> {
+		let title = validate_title(title)?;
+		let next = self.next_id.checked_add(1).ok_or(Error::IdExhausted)?;
+		let task = Task {
+			id: self.next_id,
+			title,
+			status: Status::Open,
+		};
+		self.tasks.push(task.clone());
+		self.next_id = next;
+		Ok(task)
+	}
+}
