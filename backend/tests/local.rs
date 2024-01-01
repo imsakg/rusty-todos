@@ -252,3 +252,30 @@ fn sorting_is_deterministic_and_keeps_missing_due_dates_last() {
 		2
 	);
 }
+
+#[test]
+fn pagination_runs_after_sorting_and_handles_empty_pages() {
+	let mut store = Store::default();
+	for title in ["c", "a", "b"] {
+		store.create(title).unwrap();
+	}
+	let page = Query {
+		sort: SortField::Title,
+		offset: 1,
+		limit: Some(1),
+		..Default::default()
+	};
+	assert_eq!(store.query(&page)[0].title, "b");
+	assert!(store
+		.query(&Query {
+			offset: usize::MAX,
+			..Default::default()
+		})
+		.is_empty());
+	assert!(store
+		.query(&Query {
+			limit: Some(0),
+			..Default::default()
+		})
+		.is_empty());
+}

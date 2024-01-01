@@ -326,6 +326,8 @@ pub struct Query {
 	pub overdue_as_of: Option<NaiveDate>,
 	pub sort: SortField,
 	pub descending: bool,
+	pub offset: usize,
+	pub limit: Option<usize>,
 }
 
 impl Store {
@@ -369,6 +371,10 @@ impl Store {
 			order.then(a.id.cmp(&b.id))
 		});
 		tasks
+			.into_iter()
+			.skip(query.offset)
+			.take(query.limit.unwrap_or(usize::MAX))
+			.collect()
 	}
 }
 
