@@ -66,3 +66,20 @@ impl Store {
 		Ok(task)
 	}
 }
+
+impl Store {
+	pub fn tasks(&self) -> &[Task] {
+		&self.tasks
+	}
+
+	pub fn get(&self, id: u64) -> Result<&Task> {
+		self.tasks.iter().find(|task| task.id == id).ok_or(Error::NotFound(id))
+	}
+
+	fn get_mut(&mut self, id: u64) -> Result<&mut Task> {
+		self.tasks
+			.iter_mut()
+			.find(|task| task.id == id)
+			.ok_or(Error::NotFound(id))
+	}
+}

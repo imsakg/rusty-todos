@@ -16,3 +16,13 @@ fn create_allocates_stable_ids_without_consuming_them_on_errors() {
 	assert_eq!(second.id, 2);
 	assert_eq!(second.status, Status::Open);
 }
+
+#[test]
+fn get_and_list_return_only_existing_tasks() {
+	let mut store = Store::default();
+	assert!(store.tasks().is_empty());
+	let task = store.create("read me").unwrap();
+	assert_eq!(store.get(task.id).unwrap(), &task);
+	assert_eq!(store.tasks(), &[task]);
+	assert!(matches!(store.get(999), Err(Error::NotFound(999))));
+}
