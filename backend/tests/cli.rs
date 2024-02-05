@@ -88,3 +88,16 @@ fn backup_commands_round_trip_without_silent_overwrites() {
     let other = dir.path().join("other.json");
     assert!(cli(&other, &["import", csv.to_str().unwrap(), "--format", "csv"]).status.success());
 }
+
+#[test]
+fn reminder_commands_use_explicit_time_and_do_not_redeliver_dismissed_items() {
+    let dir = tempfile::tempdir().unwrap(); let path = dir.path().join("todos.json");
+    cli(&path, &["add", "call"]);
+    assert!(cli(&path, &["reminder", "set", "1", "2024-06-03T21:00:00+03:00"]).status.success());
+    let pending = cli(&path, &["reminder", "list", "--now", "2024-06-03T18:00:00Z"]);
+    assert_eq!(serde_json::from_slice::<Vec<serde_json::Value>>(&pending.stdout).unwrap().len(), 1);
+    assert!(cli(&path, &["reminder", "dismiss", "1"]).status.success());
+    let pending = cli(&path, &["reminder", "list", "--now", "2024-06-03T18:00:00Z"]);
+    assert!(serde_json::from_slice::<Vec<serde_json::Value>>(&pending.stdout).unwrap().is_empty());
+    assert!(cli(&path, &["reminder", "clear", "1"]).status.success());
+}

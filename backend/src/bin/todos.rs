@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use clap::{Parser, Subcommand};
 use rusty_todos::local::{parse_date, Error, ImportMode, Priority, Query, Result, SortField, Status, Store};
 use std::{path::PathBuf, process::ExitCode};
@@ -14,6 +14,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Action {
+	/// Schedule, poll, acknowledge or clear reminders (no daemon).
+	Reminder {
+		#[command(subcommand)]
+		command: ReminderAction,
+	},
 	/// Export a complete backup to stdout or a new file.
 	Export {
 		#[arg(long, value_enum, default_value = "json")]
@@ -86,6 +91,15 @@ enum CategoryAction {
 fn execute(cli: Cli) -> Result<()> {
 	let mut store = Store::load(&cli.data)?;
 	let (output, changed) = match cli.command {
+		Action::Reminder { command } => match command {
+			ReminderAction::List { now } => (
+				serde_json::to_value(store.pending_reminders(now.unwrap_or_else(Utc::now)))?,
+				false,
+			),
+			ReminderAction::Set { id, at } => (serde_json::to_value(store.set_reminder(id, Some(at))?)?, true),
+			ReminderAction::Clear { id } => (serde_json::to_value(store.set_reminder(id, None)?)?, true),
+			ReminderAction::Dismiss { id } => (serde_json::to_value(store.dismiss_reminder(id)?)?, true),
+		},
 		Action::Export { format, output } => {
 			let data = match format {
 				DataFormat::Json => store.export_json()?,
@@ -221,4 +235,22 @@ impl ListArgs {
 enum DataFormat {
 	Json,
 	Csv,
+}
+
+#[derive(Subcommand)]
+enum ReminderAction {
+	List {
+		#[arg(long)]
+		now: Option<DateTime<Utc>>,
+	},
+	Set {
+		id: u64,
+		at: DateTime<Utc>,
+	},
+	Clear {
+		id: u64,
+	},
+	Dismiss {
+		id: u64,
+	},
 }
