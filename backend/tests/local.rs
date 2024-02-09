@@ -99,3 +99,19 @@ fn category_assignment_is_optional_trimmed_and_validated() {
 	assert_eq!(store.set_category(1, None).unwrap().category, None);
 	assert!(store.set_category(99, Some("work")).is_err());
 }
+
+#[test]
+fn category_renames_and_removals_update_every_member() {
+	let mut store = Store::default();
+	for title in ["a", "b"] {
+		let id = store.create(title).unwrap().id;
+		store.set_category(id, Some("work")).unwrap();
+	}
+	assert_eq!(store.categories(), vec!["work"]);
+	assert!(store.rename_category("work", " ").is_err());
+	assert_eq!(store.rename_category("work", "office").unwrap(), 2);
+	assert_eq!(store.categories(), vec!["office"]);
+	assert_eq!(store.remove_category("office").unwrap(), 2);
+	assert!(store.categories().is_empty());
+	assert!(store.remove_category("missing").is_err());
+}

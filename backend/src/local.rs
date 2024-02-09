@@ -190,3 +190,49 @@ impl Store {
 		Ok(task.clone())
 	}
 }
+
+impl Store {
+	pub fn categories(&self) -> Vec<&str> {
+		self.tasks
+			.iter()
+			.filter_map(|task| task.category.as_deref())
+			.collect::<std::collections::BTreeSet<_>>()
+			.into_iter()
+			.collect()
+	}
+
+	pub fn rename_category(&mut self, from: &str, to: &str) -> Result<usize> {
+		let to = validate_category(to)?;
+		let count = self
+			.tasks
+			.iter()
+			.filter(|task| task.category.as_deref() == Some(from))
+			.count();
+		if count == 0 {
+			return Err(Error::Invalid(format!("category {from:?} was not found")));
+		}
+		for task in &mut self.tasks {
+			if task.category.as_deref() == Some(from) {
+				task.category = Some(to.clone());
+			}
+		}
+		Ok(count)
+	}
+
+	pub fn remove_category(&mut self, name: &str) -> Result<usize> {
+		let count = self
+			.tasks
+			.iter()
+			.filter(|task| task.category.as_deref() == Some(name))
+			.count();
+		if count == 0 {
+			return Err(Error::Invalid(format!("category {name:?} was not found")));
+		}
+		for task in &mut self.tasks {
+			if task.category.as_deref() == Some(name) {
+				task.category = None;
+			}
+		}
+		Ok(count)
+	}
+}
