@@ -13,6 +13,8 @@ pub enum Error {
 	Io(#[from] std::io::Error),
 	#[error(transparent)]
 	Json(#[from] serde_json::Error),
+	#[error(transparent)]
+	Csv(#[from] csv::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -461,5 +463,29 @@ impl Store {
 		candidate.validate()?;
 		*self = candidate;
 		Ok(ImportSummary { imported })
+	}
+}
+
+pub const CSV_COLUMNS: [&str; 8] = [
+	"id",
+	"title",
+	"status",
+	"category",
+	"priority",
+	"due",
+	"reminder",
+	"reminder_dismissed",
+];
+
+impl Store {
+	pub fn export_csv(&self) -> Result<String> {
+		self.validate()?;
+		let mut writer = csv::WriterBuilder::new().has_headers(false).from_writer(Vec::new());
+		writer.write_record(CSV_COLUMNS)?;
+		for task in &self.tasks {
+			writer.serialize(task)?;
+		}
+		let bytes = writer.into_inner().map_err(|error| Error::Io(error.into_error()))?;
+		String::from_utf8(bytes).map_err(|_| Error::Invalid("CSV output is not UTF-8".into()))
 	}
 }

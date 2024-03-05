@@ -317,3 +317,15 @@ fn json_imports_are_transactional_with_explicit_conflict_modes() {
 	assert!(store.import_json(&invalid, ImportMode::Replace).is_err());
 	assert_eq!(store, incoming);
 }
+
+#[test]
+fn csv_export_quotes_commas_newlines_and_unicode() {
+	let mut store = Store::default();
+	store.create("Buy café, tea\nand \"milk\"").unwrap();
+	let data = store.export_csv().unwrap();
+	let mut reader = csv::Reader::from_reader(data.as_bytes());
+	assert_eq!(reader.headers().unwrap().get(0), Some("id"));
+	let row = reader.records().next().unwrap().unwrap();
+	assert_eq!(row.get(1), Some("Buy café, tea\nand \"milk\""));
+	assert_eq!(Store::default().export_csv().unwrap().lines().count(), 1);
+}
