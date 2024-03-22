@@ -1,5 +1,6 @@
+use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
-use rusty_todos::local::{Result, Status, Store};
+use rusty_todos::local::{parse_date, Error, Priority, Result, Status, Store};
 use std::{path::PathBuf, process::ExitCode};
 
 #[derive(Parser)]
@@ -13,6 +14,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Action {
+	/// Change optional task metadata atomically.
+	Set {
+		id: u64,
+		#[arg(long, value_enum)]
+		priority: Option<Priority>,
+		#[arg(long, value_parser = parse_date, conflicts_with = "clear_due")]
+		due: Option<NaiveDate>,
+		#[arg(long)]
+		clear_due: bool,
+	},
 	/// Add a todo; quote titles containing spaces.
 	Add { title: String },
 	/// List todos as JSON.
@@ -57,6 +68,23 @@ enum CategoryAction {
 fn execute(cli: Cli) -> Result<()> {
 	let mut store = Store::load(&cli.data)?;
 	let (output, changed) = match cli.command {
+		Action::Set {
+			id,
+			priority,
+			due,
+			clear_due,
+		} => {
+			if priority.is_none() && due.is_none() && !clear_due {
+				return Err(Error::Invalid("set requires at least one change".into()));
+			}
+			if let Some(priority) = priority {
+				store.set_priority(id, priority)?;
+			}
+			if due.is_some() || clear_due {
+				store.set_due(id, due)?;
+			}
+			(serde_json::to_value(store.get(id)?)?, true)
+		}
 		Action::Category { command } => match command {
 			CategoryAction::List => (serde_json::to_value(store.categories())?, false),
 			CategoryAction::Assign { id, name } => (serde_json::to_value(store.set_category(id, Some(&name))?)?, true),

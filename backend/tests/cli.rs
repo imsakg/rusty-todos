@@ -43,3 +43,15 @@ fn categories_can_be_managed_from_the_cli() {
     assert!(cli(&path, &["category", "clear", "1"]).status.success());
     assert!(!cli(&path, &["category", "remove", "missing"]).status.success());
 }
+
+#[test]
+fn priority_and_due_updates_are_validated_before_saving() {
+    let dir = tempfile::tempdir().unwrap(); let path = dir.path().join("todos.json");
+    cli(&path, &["add", "scheduled"]);
+    assert!(cli(&path, &["set", "1", "--priority", "urgent", "--due", "2024-02-29"]).status.success());
+    let before = std::fs::read(&path).unwrap();
+    assert!(!cli(&path, &["set", "1", "--priority", "low", "--due", "2023-02-29"]).status.success());
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+    assert!(cli(&path, &["set", "1", "--clear-due"]).status.success());
+    assert!(!cli(&path, &["set", "1"]).status.success());
+}
