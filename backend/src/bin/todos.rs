@@ -1,7 +1,11 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use clap::{Parser, Subcommand};
 use rusty_todos::local::{parse_date, Error, ImportMode, Priority, Query, Result, SortField, Status, Store, StoreLock};
-use std::{path::PathBuf, process::ExitCode};
+use std::{
+	io::Write,
+	path::{Path, PathBuf},
+	process::ExitCode,
+};
 
 #[derive(Parser)]
 #[command(name = "rusty-todos", version, about = "Local-first todo manager")]
@@ -127,13 +131,10 @@ fn execute(cli: Cli) -> Result<()> {
 				DataFormat::Csv => store.export_csv()?,
 			};
 			if let Some(path) = output {
-				use std::io::Write;
-				let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(path)?;
-				file.write_all(data.as_bytes())?;
-				file.sync_all()?;
+				write_export(&path, &data)?;
 				(serde_json::json!({"exported": store.tasks().len()}), false)
 			} else {
-				print!("{data}");
+				std::io::stdout().lock().write_all(data.as_bytes())?;
 				return Ok(());
 			}
 		}
@@ -190,7 +191,7 @@ fn execute(cli: Cli) -> Result<()> {
 	if changed {
 		store.save(&cli.data)?;
 	}
-	println!("{}", serde_json::to_string_pretty(&output)?);
+	writeln!(std::io::stdout().lock(), "{}", serde_json::to_string_pretty(&output)?)?;
 	Ok(())
 }
 
@@ -198,7 +199,7 @@ fn main() -> ExitCode {
 	match execute(Cli::parse()) {
 		Ok(()) => ExitCode::SUCCESS,
 		Err(error) => {
-			eprintln!("error: {error}");
+			let _ = writeln!(std::io::stderr().lock(), "error: {error}");
 			ExitCode::FAILURE
 		}
 	}
@@ -274,4 +275,20 @@ enum ReminderAction {
 	Dismiss {
 		id: u64,
 	},
+}
+
+fn write_export(path: &Path, data: &str) -> Result<()> {
+	let parent = path
+		.parent()
+		.filter(|p| !p.as_os_str().is_empty())
+		.unwrap_or(Path::new("."));
+	std::fs::create_dir_all(parent)?;
+	// NamedTempFile creates private files on Unix, independent of the process umask.
+	let mut file = tempfile::NamedTempFile::new_in(parent)?;
+	file.write_all(data.as_bytes())?;
+	file.as_file().sync_all()?;
+	file.persist_noclobber(path).map_err(|error| Error::Io(error.error))?;
+	#[cfg(unix)]
+	std::fs::File::open(parent)?.sync_all()?;
+	Ok(())
 }

@@ -93,3 +93,9 @@ fail before replacing the store. Titles permit text newlines, carriage returns
 and tabs, but reject other control characters (including terminal ESC/BEL).
 A dismissed reminder must retain its timestamp. Due dates use exactly four-digit
 years in `YYYY-MM-DD`; expanded signed years are not accepted.
+
+Export files are also staged in private temporary files and published with a
+no-clobber operation. On Unix their permissions are `0600`, regardless of umask.
+Only a complete export is published; existing destinations, including symlinks,
+are never replaced. Parent directories may be created. The directory itself must
+be trusted; permissions and atomic publication are not encryption.

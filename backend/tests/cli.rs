@@ -254,3 +254,32 @@ fn environment_config_and_read_only_commands_do_not_create_a_store() {
 	assert!(output.stdout.is_empty());
 	assert!(!path.exists());
 }
+
+#[cfg(unix)]
+#[test]
+fn exports_are_private_even_with_a_permissive_umask() {
+	use std::os::unix::fs::PermissionsExt;
+	let dir = tempfile::tempdir().unwrap();
+	let path = dir.path().join("todos.json");
+	cli(&path, &["add", "private"]);
+	for format in ["json", "csv"] {
+		let output = dir.path().join(format!("backup.{format}"));
+		let result = Command::new("sh")
+			.args(["-c", "umask 022; exec \"$@\"", "sh"])
+			.arg(env!("CARGO_BIN_EXE_rusty-todos"))
+			.arg("--data")
+			.arg(&path)
+			.args(["export", "--format", format, "--output"])
+			.arg(&output)
+			.output()
+			.unwrap();
+		assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+		assert_eq!(std::fs::metadata(&output).unwrap().permissions().mode() & 0o777, 0o600);
+		let before = std::fs::read(&output).unwrap();
+		assert!(!cli(&path, &["export", "--output", output.to_str().unwrap()])
+			.status
+			.success());
+		assert_eq!(std::fs::read(&output).unwrap(), before);
+	}
+	assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+}
