@@ -329,3 +329,25 @@ fn csv_export_quotes_commas_newlines_and_unicode() {
 	assert_eq!(row.get(1), Some("Buy café, tea\nand \"milk\""));
 	assert_eq!(Store::default().export_csv().unwrap().lines().count(), 1);
 }
+
+#[test]
+fn csv_import_round_trips_metadata_and_rejects_bad_rows_atomically() {
+	let mut source = Store::default();
+	source.create("café, tea").unwrap();
+	source.set_category(1, Some("home")).unwrap();
+	source.set_priority(1, Priority::High).unwrap();
+	source.set_due(1, Some(parse_date("2024-02-29").unwrap())).unwrap();
+	source
+		.set_reminder(1, Some("2024-02-28T18:00:00Z".parse().unwrap()))
+		.unwrap();
+	let csv = source.export_csv().unwrap();
+	let mut restored = Store::default();
+	restored.import_csv(&csv, ImportMode::Merge).unwrap();
+	assert_eq!(restored, source);
+	let before = restored.clone();
+	assert!(restored
+		.import_csv(&csv.replace("high", "unknown"), ImportMode::Replace)
+		.is_err());
+	assert!(restored.import_csv("title,id\na,1\n", ImportMode::Replace).is_err());
+	assert_eq!(restored, before);
+}

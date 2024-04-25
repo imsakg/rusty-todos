@@ -489,3 +489,26 @@ impl Store {
 		String::from_utf8(bytes).map_err(|_| Error::Invalid("CSV output is not UTF-8".into()))
 	}
 }
+
+impl Store {
+	pub fn import_csv(&mut self, data: &str, mode: ImportMode) -> Result<ImportSummary> {
+		let mut reader = csv::ReaderBuilder::new().from_reader(data.as_bytes());
+		if !reader.headers()?.iter().eq(CSV_COLUMNS) {
+			return Err(Error::Invalid("CSV header does not match the exported schema".into()));
+		}
+		let tasks: Vec<Task> = reader.deserialize().collect::<std::result::Result<_, _>>()?;
+		let next_id = tasks
+			.iter()
+			.map(|task| task.id)
+			.max()
+			.unwrap_or(0)
+			.checked_add(1)
+			.ok_or(Error::IdExhausted)?;
+		let incoming = Self {
+			schema_version: 1,
+			next_id,
+			tasks,
+		};
+		self.import_store(incoming, mode)
+	}
+}
