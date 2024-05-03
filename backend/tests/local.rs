@@ -351,3 +351,20 @@ fn csv_import_round_trips_metadata_and_rejects_bad_rows_atomically() {
 	assert!(restored.import_csv("title,id\na,1\n", ImportMode::Replace).is_err());
 	assert_eq!(restored, before);
 }
+
+#[test]
+fn statistics_count_open_overdue_and_grouped_tasks() {
+	let mut store = Store::default();
+	for title in ["a", "b", "c"] {
+		store.create(title).unwrap();
+	}
+	store.set_category(1, Some("work")).unwrap();
+	store.set_priority(1, Priority::High).unwrap();
+	store.set_due(1, Some(parse_date("2024-06-01").unwrap())).unwrap();
+	store.set_status(2, Status::Done).unwrap();
+	let stats = store.statistics(parse_date("2024-06-03").unwrap());
+	assert_eq!((stats.total, stats.open, stats.done, stats.overdue), (3, 2, 1, 1));
+	assert_eq!(stats.uncategorized, 2);
+	assert_eq!(stats.by_category["work"], 1);
+	assert_eq!(stats.by_priority[&Priority::High], 1);
+}

@@ -512,3 +512,46 @@ impl Store {
 		self.import_store(incoming, mode)
 	}
 }
+
+#[derive(Debug, Serialize)]
+pub struct Statistics {
+	pub total: usize,
+	pub open: usize,
+	pub done: usize,
+	pub overdue: usize,
+	pub uncategorized: usize,
+	pub by_category: std::collections::BTreeMap<String, usize>,
+	pub by_priority: std::collections::BTreeMap<Priority, usize>,
+}
+
+impl Store {
+	pub fn statistics(&self, as_of: NaiveDate) -> Statistics {
+		let mut stats = Statistics {
+			total: self.tasks.len(),
+			open: 0,
+			done: 0,
+			overdue: 0,
+			uncategorized: 0,
+			by_category: Default::default(),
+			by_priority: Default::default(),
+		};
+		for task in &self.tasks {
+			match task.status {
+				Status::Open => {
+					stats.open += 1;
+					if task.due.is_some_and(|due| due < as_of) {
+						stats.overdue += 1;
+					}
+				}
+				Status::Done => stats.done += 1,
+			}
+			if let Some(category) = &task.category {
+				*stats.by_category.entry(category.clone()).or_default() += 1;
+			} else {
+				stats.uncategorized += 1;
+			}
+			*stats.by_priority.entry(task.priority).or_default() += 1;
+		}
+		stats
+	}
+}
