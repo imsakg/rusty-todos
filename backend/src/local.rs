@@ -21,7 +21,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub fn validate_title(title: &str) -> Result<String> {
 	let title = title.trim();
-	if title.is_empty() || title.chars().count() > 500 {
+	if title.is_empty()
+		|| title.chars().count() > 500
+		|| title
+			.chars()
+			.any(|c| c.is_control() && !matches!(c, '\n' | '\r' | '\t'))
+	{
 		return Err(Error::Invalid("title must contain 1–500 characters".into()));
 	}
 	Ok(title.to_owned())
@@ -147,6 +152,12 @@ impl Store {
 		}
 		let mut ids = std::collections::HashSet::new();
 		for task in &self.tasks {
+			if task.reminder_dismissed && task.reminder.is_none() {
+				return Err(Error::Invalid("a dismissed reminder requires a timestamp".into()));
+			}
+			if let Some(due) = task.due {
+				parse_date(&due.format("%Y-%m-%d").to_string())?;
+			}
 			if let Some(category) = &task.category {
 				if validate_category(category)? != *category {
 					return Err(Error::Invalid("stored categories must be trimmed".into()));
@@ -170,7 +181,7 @@ impl Store {
 		ensure_regular_path(path)?;
 		match std::fs::File::open(path) {
 			Ok(file) => {
-				let store: Self = serde_json::from_reader(file)?;
+				let store = Self::from_json(&read_bounded(file)?)?;
 				store.validate()?;
 				Ok(store)
 			}
@@ -183,6 +194,7 @@ impl Store {
 		ensure_regular_path(path.as_ref())?;
 		self.validate()?;
 		let data = serde_json::to_vec_pretty(self)?;
+		ensure_data_size(data.len() + 1)?;
 		use std::io::Write;
 		let path = path.as_ref();
 		let parent = path
@@ -283,6 +295,16 @@ impl Store {
 }
 
 pub fn parse_date(value: &str) -> Result<NaiveDate> {
+	if value.len() != 10
+		|| !value.bytes().enumerate().all(|(i, b)| {
+			if matches!(i, 4 | 7) {
+				b == b'-'
+			} else {
+				b.is_ascii_digit()
+			}
+		}) {
+		return Err(Error::Invalid("date must use YYYY-MM-DD".into()));
+	}
 	let date = NaiveDate::parse_from_str(value, "%Y-%m-%d")
 		.map_err(|_| Error::Invalid("date must be a real YYYY-MM-DD date".into()))?;
 	if date.format("%Y-%m-%d").to_string() != value {
@@ -407,6 +429,7 @@ fn schema_version() -> u32 {
 
 impl Store {
 	pub fn from_json(data: &str) -> Result<Self> {
+		ensure_data_size(data.len())?;
 		let store: Self = serde_json::from_str(data)?;
 		store.validate()?;
 		Ok(store)
@@ -414,7 +437,9 @@ impl Store {
 
 	pub fn export_json(&self) -> Result<String> {
 		self.validate()?;
-		Ok(format!("{}\n", serde_json::to_string_pretty(self)?))
+		let data = format!("{}\n", serde_json::to_string_pretty(self)?);
+		ensure_data_size(data.len())?;
+		Ok(data)
 	}
 }
 
@@ -489,12 +514,14 @@ impl Store {
 			writer.serialize(task)?;
 		}
 		let bytes = writer.into_inner().map_err(|error| Error::Io(error.into_error()))?;
+		ensure_data_size(bytes.len())?;
 		String::from_utf8(bytes).map_err(|_| Error::Invalid("CSV output is not UTF-8".into()))
 	}
 }
 
 impl Store {
 	pub fn import_csv(&mut self, data: &str, mode: ImportMode) -> Result<ImportSummary> {
+		ensure_data_size(data.len())?;
 		let mut reader = csv::ReaderBuilder::new().from_reader(data.as_bytes());
 		if !reader.headers()?.iter().eq(CSV_COLUMNS) {
 			return Err(Error::Invalid("CSV header does not match the exported schema".into()));
@@ -618,4 +645,33 @@ impl StoreLock {
 		})?;
 		Ok(Self { _file: file })
 	}
+}
+
+/// Bound local files and imports to keep accidental/hostile inputs manageable.
+pub const MAX_DATA_BYTES: usize = 8 * 1024 * 1024;
+
+fn ensure_data_size(bytes: usize) -> Result<()> {
+	if bytes > MAX_DATA_BYTES {
+		return Err(Error::Invalid("data exceeds the 8 MiB limit".into()));
+	}
+	Ok(())
+}
+
+fn read_bounded(file: std::fs::File) -> Result<String> {
+	use std::io::Read;
+	let metadata = file.metadata()?;
+	if !metadata.is_file() {
+		return Err(Error::Invalid("input must be a regular file".into()));
+	}
+	if metadata.len() > MAX_DATA_BYTES as u64 {
+		return Err(Error::Invalid("data exceeds the 8 MiB limit".into()));
+	}
+	let mut data = String::new();
+	file.take(MAX_DATA_BYTES as u64 + 1).read_to_string(&mut data)?;
+	ensure_data_size(data.len())?;
+	Ok(data)
+}
+
+pub fn read_data(path: impl AsRef<std::path::Path>) -> Result<String> {
+	read_bounded(std::fs::File::open(path)?)
 }

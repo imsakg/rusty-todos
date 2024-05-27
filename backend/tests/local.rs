@@ -404,3 +404,36 @@ fn data_symlinks_are_rejected_instead_of_splitting_the_store() {
 	assert!(store.save(&alias).is_err());
 	assert!(std::fs::symlink_metadata(&alias).unwrap().file_type().is_symlink());
 }
+
+#[test]
+fn import_boundaries_reject_oversized_data_and_inconsistent_metadata() {
+	let oversized = " ".repeat(MAX_DATA_BYTES + 1);
+	assert!(Store::from_json(&oversized).is_err());
+	let mut store = Store::default();
+	assert!(store.import_csv(&oversized, ImportMode::Replace).is_err());
+	let dir = tempfile::tempdir().unwrap();
+	let path = dir.path().join("large.json");
+	std::fs::File::create(&path)
+		.unwrap()
+		.set_len((MAX_DATA_BYTES + 1) as u64)
+		.unwrap();
+	assert!(Store::load(&path).is_err());
+	let bad = r#"{"next_id":2,"tasks":[{"id":1,"title":"x","status":"open","reminder_dismissed":true}]}"#;
+	assert!(Store::from_json(bad).is_err());
+	assert!(parse_date("+12345-01-01").is_err());
+}
+
+#[test]
+fn terminal_control_sequences_are_rejected_at_all_title_boundaries() {
+	for title in ["bad\u{1b}]52;c;payload\u{7}", "bad\u{7}"] {
+		let mut store = Store::default();
+		assert!(store.create(title).is_err());
+		store.create("safe").unwrap();
+		assert!(store.rename(1, title).is_err());
+		let mut document: serde_json::Value = serde_json::from_str(&store.export_json().unwrap()).unwrap();
+		document["tasks"][0]["title"] = title.into();
+		assert!(store.import_json(&document.to_string(), ImportMode::Replace).is_err());
+		assert_eq!(store.get(1).unwrap().title, "safe");
+	}
+	assert!(validate_title("valid\nmultiline\ttext").is_ok());
+}

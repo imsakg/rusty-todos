@@ -146,7 +146,7 @@ fn execute(cli: Cli) -> Result<()> {
 			if matches!(mode, ImportMode::Replace) && !yes {
 				return Err(Error::Invalid("replace requires --yes; export a backup first".into()));
 			}
-			let data = std::fs::read_to_string(input)?;
+			let data = rusty_todos::local::read_data(input)?;
 			let summary = match format {
 				DataFormat::Json => store.import_json(&data, mode)?,
 				DataFormat::Csv => store.import_csv(&data, mode)?,

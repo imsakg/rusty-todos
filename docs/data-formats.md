@@ -84,3 +84,12 @@ A corrupted file returns an error. Move a **copy** aside for investigation and
 restore a known-good JSON export to a different path first. Do not hand-edit a
 store while the CLI is running. Never put the JSON file under the old database's
 schema-initialization path; the CLI and the web demo are separate data stores.
+
+## Input limits
+
+Stores, imports and exports are limited to 8 MiB of UTF-8 data. File reads are
+bounded even if a file grows after its initial metadata check. Oversized writes
+fail before replacing the store. Titles permit text newlines, carriage returns
+and tabs, but reject other control characters (including terminal ESC/BEL).
+A dismissed reminder must retain its timestamp. Due dates use exactly four-digit
+years in `YYYY-MM-DD`; expanded signed years are not accepted.
