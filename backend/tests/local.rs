@@ -215,3 +215,40 @@ fn search_and_due_filters_exclude_unscheduled_and_completed_overdue_tasks() {
 		2
 	);
 }
+
+#[test]
+fn sorting_is_deterministic_and_keeps_missing_due_dates_last() {
+	let mut store = Store::default();
+	for title in ["Zebra", "alpha", "alpha"] {
+		store.create(title).unwrap();
+	}
+	let title = Query {
+		sort: SortField::Title,
+		..Default::default()
+	};
+	assert_eq!(
+		store.query(&title).iter().map(|t| t.id).collect::<Vec<_>>(),
+		vec![2, 3, 1]
+	);
+	store.set_due(2, Some(parse_date("2024-06-01").unwrap())).unwrap();
+	store.set_due(3, Some(parse_date("2024-06-02").unwrap())).unwrap();
+	let due = Query {
+		sort: SortField::Due,
+		descending: true,
+		..Default::default()
+	};
+	assert_eq!(
+		store.query(&due).iter().map(|t| t.id).collect::<Vec<_>>(),
+		vec![3, 2, 1]
+	);
+	store.set_priority(2, Priority::Urgent).unwrap();
+	assert_eq!(
+		store.query(&Query {
+			sort: SortField::Priority,
+			descending: true,
+			..Default::default()
+		})[0]
+			.id,
+		2
+	);
+}

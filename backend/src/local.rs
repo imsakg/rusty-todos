@@ -324,12 +324,15 @@ pub struct Query {
 	pub search: Option<String>,
 	pub due_before: Option<NaiveDate>,
 	pub overdue_as_of: Option<NaiveDate>,
+	pub sort: SortField,
+	pub descending: bool,
 }
 
 impl Store {
 	pub fn query(&self, query: &Query) -> Vec<&Task> {
 		let search = query.search.as_ref().map(|value| value.to_lowercase());
-		self.tasks
+		let mut tasks: Vec<_> = self
+			.tasks
 			.iter()
 			.filter(|task| {
 				search
@@ -349,6 +352,31 @@ impl Store {
 					&& (!query.uncategorized || task.category.is_none())
 					&& query.priority.is_none_or(|priority| task.priority == priority)
 			})
-			.collect()
+			.collect();
+		tasks.sort_by(|a, b| {
+			use std::cmp::Ordering;
+			let order = match query.sort {
+				SortField::Id => a.id.cmp(&b.id),
+				SortField::Title => a.title.to_lowercase().cmp(&b.title.to_lowercase()),
+				SortField::Priority => a.priority.cmp(&b.priority),
+				SortField::Due => match (a.due, b.due) {
+					(None, Some(_)) => return Ordering::Greater,
+					(Some(_), None) => return Ordering::Less,
+					(a, b) => a.cmp(&b),
+				},
+			};
+			let order = if query.descending { order.reverse() } else { order };
+			order.then(a.id.cmp(&b.id))
+		});
+		tasks
 	}
+}
+
+#[derive(Debug, Clone, Copy, Default, clap::ValueEnum)]
+pub enum SortField {
+	#[default]
+	Id,
+	Title,
+	Priority,
+	Due,
 }
