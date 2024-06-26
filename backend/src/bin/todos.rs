@@ -27,11 +27,45 @@ enum Action {
 	Done { id: u64 },
 	/// Reopen a completed todo.
 	Reopen { id: u64 },
+	/// Assign, rename, list or remove categories.
+	Category {
+		#[command(subcommand)]
+		command: CategoryAction,
+	},
+}
+
+#[derive(Subcommand)]
+enum CategoryAction {
+	List,
+	Assign {
+		id: u64,
+		name: String,
+	},
+	Clear {
+		id: u64,
+	},
+	Rename {
+		from: String,
+		to: String,
+	},
+	/// Remove a category from every member; keep the tasks.
+	Remove {
+		name: String,
+	},
 }
 
 fn execute(cli: Cli) -> Result<()> {
 	let mut store = Store::load(&cli.data)?;
 	let (output, changed) = match cli.command {
+		Action::Category { command } => match command {
+			CategoryAction::List => (serde_json::to_value(store.categories())?, false),
+			CategoryAction::Assign { id, name } => (serde_json::to_value(store.set_category(id, Some(&name))?)?, true),
+			CategoryAction::Clear { id } => (serde_json::to_value(store.set_category(id, None)?)?, true),
+			CategoryAction::Rename { from, to } => {
+				(serde_json::json!({"updated": store.rename_category(&from, &to)?}), true)
+			}
+			CategoryAction::Remove { name } => (serde_json::json!({"updated": store.remove_category(&name)?}), true),
+		},
 		Action::Add { title } => (serde_json::to_value(store.create(&title)?)?, true),
 		Action::List => (serde_json::to_value(store.tasks())?, false),
 		Action::Show { id } => (serde_json::to_value(store.get(id)?)?, false),

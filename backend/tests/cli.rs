@@ -31,3 +31,15 @@ fn edits_completion_and_deletion_persist() {
     assert!(cli(&path, &["delete", "1"]).status.success());
     assert!(!cli(&path, &["show", "1"]).status.success());
 }
+
+#[test]
+fn categories_can_be_managed_from_the_cli() {
+    let dir = tempfile::tempdir().unwrap(); let path = dir.path().join("todos.json");
+    cli(&path, &["add", "categorized"]);
+    assert!(cli(&path, &["category", "assign", "1", "work"]).status.success());
+    assert!(cli(&path, &["category", "rename", "work", "office"]).status.success());
+    let output = cli(&path, &["category", "list"]);
+    assert_eq!(serde_json::from_slice::<Vec<String>>(&output.stdout).unwrap(), vec!["office"]);
+    assert!(cli(&path, &["category", "clear", "1"]).status.success());
+    assert!(!cli(&path, &["category", "remove", "missing"]).status.success());
+}
